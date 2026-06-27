@@ -1,0 +1,29 @@
+#!@TERMUX_PREFIX@/bin/bash
+
+# Setup TERMUX_APP_PACKAGE_MANAGER
+source "@TERMUX_PREFIX@/bin/termux-setup-package-manager" || exit 1
+
+usage() {
+	echo "Usage: termux-change-repo"
+	echo ""
+	echo "VAJ uses an immutable repository configuration."
+	echo "Repository changes are not supported by this command."
+	echo "Active source files:"
+	for filename in "@TERMUX_PREFIX@/etc/apt/sources.list" "@TERMUX_PREFIX@/etc/apt/sources.list.d/"*; do
+		[ -e "$filename" ] || continue
+		echo "--- $filename"
+		sed -n '1,120p' "$filename"
+	done
+}
+
+if [ "${1-}" = "--help" ] || [ "${1-}" = "-help" ]; then
+	usage
+	exit 0
+fi
+
+if [ $# -gt 0 ]; then
+	usage
+	exit 1
+fi
+
+usage

@@ -1,0 +1,248 @@
+#!/bin/bash
+set -eu
+
+# Root Check
+if [[ "$(id -u)" == "0" ]]; then
+	echo "Error: Cannot run 'pkg' command as root"
+	exit 1
+fi
+
+# Setup TERMUX_APP_PACKAGE_MANAGER
+source "@TERMUX_PREFIX@/bin/termux-setup-package-manager" || exit 1
+
+show_help() {
+	local cache_size
+	local cache_dir=""
+	if [ "$TERMUX_APP_PACKAGE_MANAGER" = "apt" ]; then
+		cache_dir="@TERMUX_CACHE_DIR@/apt/archives"
+	elif [ "$TERMUX_APP_PACKAGE_MANAGER" = "pacman" ]; then
+		cache_dir="@TERMUX_PREFIX@/var/cache/pacman/pkg"
+	fi
+	cache_size=$(du -sh "$cache_dir" 2>/dev/null | cut -f1)
+
+	echo 'Usage: pkg command [arguments]'
+	echo "A tool for managing $TERMUX_APP_PACKAGE_MANAGER packages."
+	echo 'Commands:'
+	echo
+	echo "  autoclean            - Remove all outdated packages from $TERMUX_APP_PACKAGE_MANAGER"
+	echo '                         cache.'
+	echo
+	echo "  clean                - Remove all packages from $TERMUX_APP_PACKAGE_MANAGER cache."
+	[ -n "$cache_size" ] &&
+	echo "                         Using $cache_size now."
+	echo
+	echo '  files <packages>     - Show all files installed by packages.'
+	echo
+	echo '  install <packages>   - Install specified packages.'
+	echo
+	echo '  list-all             - List all packages available in repositories.'
+	echo
+	echo '  list-installed       - List installed packages.'
+	echo
+	echo '  reinstall <packages> - Reinstall specified installed packages at the'
+	echo '                         latest version.'
+	echo
+	echo '  search <query>       - Search package by query, for example by name or'
+	echo '                         description part.'
+	echo
+	echo '  show <packages>      - Show basic metadata, such as dependencies.'
+	echo
+	echo '  uninstall <packages> - Uninstall specified packages. Configuration files'
+	echo '                         will be left intact.'
+	echo
+	echo '  upgrade              - Upgrade all installed packages to the latest'
+	echo '                         version.'
+	echo
+	echo "  update               - Update $TERMUX_APP_PACKAGE_MANAGER databases from configured"
+	echo '                         repositories.'
+	echo
+	exit 1
+}
+
+check_command() {
+	local command="$1"
+
+	local errors
+	if ! errors="$("$@" 2>&1 1>/dev/null)"; then
+		echo "$errors" 1>&2
+		echo "Failed to run the '$command' command." 1>&2
+		if [[ "$errors" == *"CANNOT LINK EXECUTABLE"* ]]; then
+			echo -n "To fix the '$command' command, manually upgrade all packages by running: " 1>&2
+			case "$TERMUX_APP_PACKAGE_MANAGER" in
+				apt) echo "\`apt update && apt full-upgrade\`" 1>&2;;
+				pacman) echo "\`pacman -Syu\`" 1>&2;;
+			esac
+		fi
+		exit 1
+	fi
+}
+
+hostname() {
+	echo "$1" | awk -F'[/:]' '{print $4}'
+}
+
+last_modified() {
+	local mtime
+	local now
+
+	mtime=$(date -r "$1" '+%s')
+	now=$(date '+%s')
+	echo $((now - mtime))
+}
+
+has_repo() {
+	# Check if root-repo or x11-repo are installed
+	repo="$1"
+
+	if [ -f "@TERMUX_PREFIX@/etc/apt/sources.list.d/$repo.list" ]; then
+		echo true
+	else
+		echo false
+	fi
+}
+
+unset_mirror_variables() {
+	unset MAIN
+	unset X11
+	unset ROOT
+	unset WEIGHT
+}
+
+get_mirror_url() {
+	local -r _mirror="$1"
+	local -r _has_repo_x11="$2"
+	local -r _has_repo_root="$3"
+
+	unset_mirror_variables
+	source "$_mirror"
+
+	if [[ -z "${MAIN:-}" ]]; then
+		echo "Warn: Ignoring mirror '$_mirror' without main channel url" >&2
+		return 0
+	elif [[ ! "${MAIN:-}" =~ ^https?://[^[:space:]]+$ ]]; then
+		echo "Warn: Ignoring mirror '$_mirror' with invalid main channel url '${MAIN:-}'" >&2
+		return 0
+	fi
+
+	if [[ "$_has_repo_x11" == "true" ]]; then
+		if [[ -z "${X11:-}" ]]; then
+			echo "Warn: Ignoring mirror '$_mirror' without x11 channel url" >&2
+			return 0
+		elif [[ ! "${X11:-}" =~ ^https?://[^[:space:]]+$ ]]; then
+			echo "Warn: Ignoring mirror '$_mirror' with invalid x11 channel url '${X11:-}'" >&2
+			return 0
+		fi
+	fi
+
+	if [[ "$_has_repo_root" == "true" ]]; then
+		if [[ -z "${ROOT:-}" ]]; then
+			echo "Warn: Ignoring mirror '$_mirror' without root channel url" >&2
+			return 0
+		elif [[ ! "${ROOT:-}" =~ ^https?://[^[:space:]]+$ ]]; then
+			echo "Warn: Ignoring mirror '$_mirror' with invalid root channel url '${ROOT:-}'" >&2
+			return 0
+		fi
+	fi
+
+	if [[ ! "${WEIGHT:-}" =~ ^[0-9]+$ ]]; then
+		echo "Warn: Ignoring mirror '$_mirror' with invalid weight '${WEIGHT:-}'" >&2
+		return 0
+	fi
+
+	echo "$MAIN"
+}
+
+get_mirror_weight() {
+	unset_mirror_variables
+	source "$1"
+	echo "$WEIGHT"
+}
+
+select_mirror() {
+	return 0
+}
+
+update_apt_cache() {
+	local current_host
+	current_host=$(head -n 1 <(sed -nE -e 's|^\s*deb\s+https?://(.+)\s+stable\s+main$|\1|p' @TERMUX_PREFIX@/etc/apt/sources.list) || true)
+
+	if [ -z "$current_host" ]; then
+		# No primary repositories configured?
+		apt update
+		return
+	fi
+
+	local metadata_file
+	metadata_file=$(
+		list_prefix=$(echo "$current_host" | sed 's|/|_|g')
+		arch=$(dpkg --print-architecture)
+		echo "@TERMUX_PREFIX@/var/lib/apt/lists/${list_prefix}_dists_stable_main_binary-${arch}_Packages" | sed 's|__|_|g'
+	)
+
+	if [ ! -e "@TERMUX_CACHE_DIR@/apt/pkgcache.bin" ] || [ ! -e "$metadata_file" ]; then
+		apt update
+		return
+	fi
+
+	local cache_modified
+	cache_modified=$(last_modified "@TERMUX_CACHE_DIR@/apt/pkgcache.bin")
+
+	local sources_modified
+	sources_modified=$(last_modified "@TERMUX_PREFIX@/etc/apt/sources.list")
+
+	if (( sources_modified <= cache_modified )) || (( cache_modified > 1200 )); then
+		apt update
+	fi
+}
+
+if [ "${1-}" = "--check-mirror" ]; then
+	# The VAJ package chain uses an immutable repository configuration.
+	shift 1
+fi
+
+if [[ $# = 0 || $(echo "$1" | grep "^h") ]]; then
+	show_help
+fi
+
+CMD="$1"
+shift 1
+ERROR=false
+
+case "$TERMUX_APP_PACKAGE_MANAGER" in
+	apt)
+		case "$CMD" in
+			f*) dpkg -L "$@";;
+			sh*|inf*) apt show "$@";;
+			add|i*) update_apt_cache; apt install "$@";;
+			autoc*) apt autoclean;;
+			cl*) apt clean;;
+			list-a*) apt list "$@";;
+			list-i*) apt list --installed "$@";;
+			rei*) apt install --reinstall "$@";;
+			se*) update_apt_cache; apt search "$@";;
+			un*|rem*|rm|del*) apt remove "$@";;
+			upd*) apt update;;
+			up|upg*) apt update; apt full-upgrade "$@";;
+			*) ERROR=true;;
+		esac;;
+	pacman)
+		case "$CMD" in
+			f*) pacman -Ql "$@";;
+			sh*|inf*) pacman -Qi "$@";;
+			add|i*) pacman -Sy --needed "$@";;
+			autoc*) pacman -Sc;;
+			cl*) pacman -Scc;;
+			list-a*) pacman -Sl "$@";;
+			list-i*) pacman -Q "$@";;
+			rei*) pacman -S "$@";;
+			se*) pacman -Sys "$@";;
+			un*|rem*|rm|del*) pacman -Rcns "$@";;
+                        upd*) pacman -Sy "$@";;
+			up|upg*) pacman -Syu "$@";;
+			*) ERROR=true;;
+		esac;;
+esac
+
+if $ERROR; then
+	echo "Unknown command: '$CMD' (run 'pkg help' for usage information)"; exit 1
+fi

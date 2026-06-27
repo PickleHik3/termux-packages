@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Basic system tools for Termux"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="1.46.0+really1.45.0"
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=https://github.com/termux/termux-tools/archive/refs/tags/v1.45.0.tar.gz
 TERMUX_PKG_SHA256=1ae29b1b875d95cc626dae323b45a2ace759969862d96094b2fa6d13bffe20d2
 TERMUX_PKG_ESSENTIAL=true
@@ -20,6 +20,16 @@ TERMUX_PKG_DEPENDS="bzip2, coreutils, curl, dash, diffutils, findutils, gawk, gr
 
 # Optional packages that are distributed as part of bootstrap archives.
 TERMUX_PKG_RECOMMENDS="ed, dos2unix, inetutils, net-tools, patch, unzip"
+
+termux_step_post_get_source() {
+	local overlay_dir="$TERMUX_PKG_BUILDER_DIR/vaj-overlay"
+
+	cp "$overlay_dir/scripts/pkg.in" "$TERMUX_PKG_SRCDIR/scripts/pkg.in"
+	cp "$overlay_dir/scripts/termux-change-repo.in" "$TERMUX_PKG_SRCDIR/scripts/termux-change-repo.in"
+	cp "$overlay_dir/mirrors/Makefile.am" "$TERMUX_PKG_SRCDIR/mirrors/Makefile.am"
+	cp "$overlay_dir/motds/Makefile.am" "$TERMUX_PKG_SRCDIR/motds/Makefile.am"
+	cp "$overlay_dir/motds/motd.sh.in" "$TERMUX_PKG_SRCDIR/motds/motd.sh.in"
+}
 
 termux_step_pre_configure() {
 	# termux-tools bakes runtime paths into installed scripts during configure.
