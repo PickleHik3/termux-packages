@@ -24,10 +24,10 @@ index 1faa9a555..64f2dfcfa 100644
  	setimes = targisdir = 0;
  	mask = umask(0);
  	if (!pflag) {
+ 		(void) umask(mask);
 +#ifndef __ANDROID__
  		mask |= 07000;
 +#endif
- 		(void) umask(mask);
  	}
  	if (argc != 1) {
 -- 
