@@ -53,7 +53,11 @@ fi
 # --- (re)create build container with recipes mounted ---
 docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 echo "[remote-build] starting container '$CONTAINER' from $IMAGE"
+# fuse-overlayfs needs /dev/fuse + CAP_SYS_ADMIN; without them the build system
+# silently fails to mount the prefix overlay and produces zero debs.
 docker run -d --name "$CONTAINER" \
+  --cap-add CAP_SYS_ADMIN --device /dev/fuse \
+  --security-opt apparmor=unconfined \
   -v "$RECIPES_DIR:/home/builder/termux-packages" \
   "$IMAGE" sleep infinity >/dev/null
 
