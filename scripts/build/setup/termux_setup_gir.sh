@@ -63,16 +63,29 @@ termux_setup_gir() {
 				"$TERMUX_SCRIPTDIR/packages/gobject-introspection/gi-cross-launcher.sh" \
 				"$GI_CROSS_LAUNCHER"
 
+			# VAJ builder: the frozen image's Ubuntu 24.04 giscanner 1.80 cannot
+			# parse NDK r29 headers or <pointer> tags in pre-generated gir
+			# dumps. Prefer a newer host toolchain in /home/builder/local when
+			# present (glib 2.86 + gobject-introspection 1.86, built in-container).
+			local _host_gi_prefix=/usr
+			local _host_gi_env=""
+			if [ -x /home/builder/local/bin/g-ir-scanner ]; then
+				_host_gi_prefix=/home/builder/local
+				_host_gi_env='export LD_LIBRARY_PATH="/home/builder/local/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"'
+			fi
+
 			cat > "$scanner" <<-EOF
 				#!$(command -v sh)
-				export XDG_DATA_DIRS="$TERMUX_PREFIX/share"
-				exec /usr/bin/g-ir-scanner "\$@"
+				export XDG_DATA_DIRS="$TERMUX_PREFIX/share:$_host_gi_prefix/share"
+				$_host_gi_env
+				exec $_host_gi_prefix/bin/g-ir-scanner "\$@"
 			EOF
 			chmod 0700 "$scanner"
 
 			cat > "$compiler" <<-EOF
 				#!$(command -v sh)
-				exec /usr/bin/g-ir-compiler "\$@" \
+				$_host_gi_env
+				exec $_host_gi_prefix/bin/g-ir-compiler "\$@" \
 					--includedir "$TERMUX_PREFIX/share/gir-1.0"
 			EOF
 			chmod 0700 "$compiler"
