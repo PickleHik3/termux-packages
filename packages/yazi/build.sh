@@ -79,7 +79,7 @@ termux_step_make_install() {
 		mkdir -p "${TERMUX_PREFIX}/share/icons/hicolor/${res}x${res}/apps"
 		$termux_proot_run magick assets/logo.png \
 			-resize "${res}x${res}" \
-			"${TERMUX_PREFIX}/share/icons/hicolor/${res}x${res}/apps/yazi.png"
+			"${TERMUX_PREFIX}/share/icons/hicolor/${res}x${res}/apps/yazi.png" || true
 		[[ -e "${TERMUX_PREFIX}/share/icons/hicolor/${res}x${res}/apps/yazi.png" ]] && {
 			echo -n " ${res}x${res}"
 		}
