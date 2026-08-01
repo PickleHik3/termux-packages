@@ -3,46 +3,17 @@
 # Setup TERMUX_APP_PACKAGE_MANAGER
 source "@TERMUX_PREFIX@/bin/termux-setup-package-manager" || exit 1
 
-terminal_width="$(stty size | cut -d" " -f2)"
-if [[ "$terminal_width" =~ ^[0-9]+$ ]] && [ "$terminal_width" -gt 60 ]; then
+motd="
+\e[1mWelcome to VAJ Terminal!\e[0m
 
-    motd="
- \e[47m                \e[0m  \e[1mWelcome to Termux!\e[0m
- \e[47m  \e[0m            \e[0;37m\e[47m .\e[0m
- \e[47m  \e[0m  \e[47m  \e[0m        \e[47m  \e[0m  \e[1mDocs:\e[0m      \e[4mhttps://termux.dev/docs\e[0m
- \e[47m  \e[0m  \e[47m  \e[0m        \e[47m  \e[0m  \e[1mDonate:\e[0m    \e[4mhttps://termux.dev/donate\e[0m
- \e[47m  \e[0m            \e[47m  \e[0m  \e[1mCommunity:\e[0m \e[4mhttps://termux.dev/community\e[0m
- \e[47m  \e[0m            \e[0;37m\e[47m .\e[0m
- \e[47m                \e[0m  \e[1mTermux version:\e[0m ${TERMUX_VERSION-Unknown}
-"
+\e[1mPackages:\e[0m \e[4mhttps://repo.pathayam.xyz\e[0m
 
-    motd_indent="                   "
+\e[1mWorking with packages:\e[0m
+\e[1mSearch:\e[0m  pkg search <query>
+\e[1mInstall:\e[0m pkg install <package>
+\e[1mUpgrade:\e[0m pkg upgrade
 
-else
-
-    motd="
-\e[1mWelcome to Termux!\e[0m
-
-\e[1mDocs:\e[0m      \e[4mhttps://termux.dev/docs\e[0m
-\e[1mDonate:\e[0m    \e[4mhttps://termux.dev/donate\e[0m
-\e[1mCommunity:\e[0m \e[4mhttps://termux.dev/community\e[0m
-
-\e[1mTermux version:\e[0m ${TERMUX_VERSION-Unknown}
-"
-
-    motd_indent=""
-fi
-
-motd+="
-${motd_indent}\e[1mWorking with packages:\e[0m
-${motd_indent}\e[1mSearch:\e[0m  pkg search <query>
-${motd_indent}\e[1mInstall:\e[0m pkg install <package>
-${motd_indent}\e[1mUpgrade:\e[0m pkg upgrade
-"
-
-
-motd+="
-${motd_indent}Report issues at \e[4mhttps://termux.dev/issues\e[0m
+\e[1mApp version:\e[0m ${TERMUX_VERSION-Unknown}
 "
 
 echo -e "$motd"
