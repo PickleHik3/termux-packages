@@ -74,11 +74,14 @@ termux_setup_gir() {
 				_host_gi_env='export LD_LIBRARY_PATH="/home/builder/local/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"'
 			fi
 
+			# Exec via /usr/bin/python3 explicitly: the scanner's `env python3`
+			# shebang would resolve to a crossenv python inside python-package
+			# builds, losing Ubuntu's dist-packages (setuptools distutils shim).
 			cat > "$scanner" <<-EOF
 				#!$(command -v sh)
 				export XDG_DATA_DIRS="$TERMUX_PREFIX/share:$_host_gi_prefix/share"
 				$_host_gi_env
-				exec $_host_gi_prefix/bin/g-ir-scanner "\$@"
+				exec /usr/bin/python3 $_host_gi_prefix/bin/g-ir-scanner "\$@"
 			EOF
 			chmod 0700 "$scanner"
 
