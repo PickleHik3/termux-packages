@@ -20,5 +20,8 @@ termux_step_post_make_install() {
 	# We are using Ubuntu's host python for installing the package which may be of
 	# different major version. Python bytecode isn't compatible across versions.
 	# So get rid of it
-	rm -r "$TERMUX_PREFIX/lib/python$(python -c "from sys import version_info as v; print(f'{v.major}.{v.minor}', end='')")/site-packages/xcbgen/__pycache__/"
+	# Host and target python versions can differ: the module installs into
+	# $TERMUX_PYTHON_HOME (target version) while byte-compilation runs with
+	# the host python. Sweep every candidate site-packages dir.
+	rm -rf "$TERMUX_PREFIX"/lib/python*/site-packages/xcbgen/__pycache__/
 }
