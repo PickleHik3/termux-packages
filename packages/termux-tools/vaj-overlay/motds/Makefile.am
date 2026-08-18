@@ -45,6 +45,12 @@ motd:
 
 	@echo "Welcome to VAJ Terminal!" > motd
 	@echo "" >> motd
+	@echo "NOTICE: VAJ Terminal is deprecated. v0.2.34-vaj is the final" >> motd
+	@echo "feature release. The package repository stays available" >> motd
+	@echo "(read-only) for at least 6 months. Its successor is the Nix" >> motd
+	@echo "edition - migration guide:" >> motd
+	@echo "https://picklehik3.github.io/termux-launcher-site/migrate-vaj.html" >> motd
+	@echo "" >> motd
 	@echo "Packages:   https://repo.pathayam.xyz" >> motd
 
 	@echo "" >> motd

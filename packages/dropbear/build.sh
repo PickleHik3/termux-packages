@@ -12,6 +12,10 @@ TERMUX_PKG_CONFLICTS="openssh"
 TERMUX_PKG_BUILD_IN_SRC=true
 
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--disable-syslog --disable-utmp --disable-utmpx --disable-wtmp --disable-static"
+# The container prefix accumulates every built library, so configure finds the
+# system libtomcrypt — which is built without LTM_DESC and cannot link. Upstream
+# CI never has it installed and silently uses the bundled copy; force that.
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" --enable-bundled-libtom"
 # Avoid linking to libcrypt for server password authentication:
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS+=" ac_cv_lib_crypt_crypt=no"
 # BIonic is special case, as usuas.

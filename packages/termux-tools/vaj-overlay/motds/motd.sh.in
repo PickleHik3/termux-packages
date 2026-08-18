@@ -6,6 +6,11 @@ source "@TERMUX_PREFIX@/bin/termux-setup-package-manager" || exit 1
 motd="
 \e[1mWelcome to VAJ Terminal!\e[0m
 
+\e[1;33mNOTICE:\e[0m VAJ Terminal is deprecated. v0.2.34-vaj is the final
+feature release. The package repository stays available (read-only)
+for at least 6 months. Its successor is the Nix edition — migration
+guide: \e[4mhttps://picklehik3.github.io/termux-launcher-site/migrate-vaj.html\e[0m
+
 \e[1mPackages:\e[0m \e[4mhttps://repo.pathayam.xyz\e[0m
 
 \e[1mWorking with packages:\e[0m
