@@ -21,6 +21,10 @@
 #   ./remote-build.sh --pkgs zsh jq bc      # named packages
 #   ./remote-build.sh ... --no-publish      # build only, skip the staging handoff
 #   ./remote-build.sh ... --publish-all     # hand off EVERY deb in output/, not just this run's
+#   ./remote-build.sh ... --handoff-every N # in queue mode, also hand off finished debs every N
+#                                           # minutes while the queue runs (default 60; 0 = end only)
+#
+# Queue mode honours UPDATES_ONLY=1 and DRY_RUN=1 (see build-all-queue.sh).
 set -euo pipefail
 
 IMAGE="${VAJ_BUILDER_IMAGE:-io-vaj-phase0a-builder:c9cc6b28}"
@@ -30,6 +34,7 @@ RECIPES_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT_DIR="$RECIPES_DIR/output"
 PUBLISH=1
 PUBLISH_ALL=0
+HANDOFF_EVERY=60
 MODE="queue"
 declare -a PKGS=()
 QUEUE_FILE="build-all-queue.sh"
@@ -42,6 +47,7 @@ while [ $# -gt 0 ]; do
     # this flag existed). Publishes every deb in the directory -- confirm the
     # contents first.
     --publish-all) PUBLISH_ALL=1; shift ;;
+    --handoff-every) HANDOFF_EVERY="$2"; shift 2 ;;
     --pkgs) MODE="pkgs"; shift; while [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; do PKGS+=("$1"); shift; done ;;
     *.txt) MODE="tier"; QUEUE_FILE="$1"; shift ;;
     *) echo "Unknown arg: $1" >&2; exit 2 ;;
@@ -81,23 +87,81 @@ echo "[remote-build] importing VAJ archive public key"
 docker exec "$CONTAINER" gpg --batch --quiet --import \
   /home/builder/termux-packages/vaj-archive-key.asc
 
+# --- hand off to central publish ---
+# publish.yml runs under a concurrency group that keeps at most ONE pending
+# run: a third staging release created while one publishes and one waits
+# would get its run cancelled and sit unconsumed. So wait for the previous
+# staging release to be consumed before creating the next one.
+wait_for_staging_clear() {
+  [ "$PUBLISH" -eq 1 ] || return 0
+  local waited=0
+  while [ -n "$(gh release list -R "$APT_REPO" --json tagName -q '.[] | select(.tagName | startswith("staging-")) | .tagName' 2>/dev/null)" ]; do
+    if [ "$waited" -ge 3600 ]; then
+      echo "[remote-build] WARNING: a staging-* release has been pending for an hour; handing off anyway" >&2
+      return 0
+    fi
+    [ "$waited" -eq 0 ] && echo "[remote-build] previous staging release not yet consumed by publish.yml; waiting"
+    sleep 60; waited=$((waited + 60))
+  done
+}
+
+# Hand off every deb written since the last handoff. output/ is persistent and
+# on a machine that has built before it can hold thousands of debs from earlier
+# runs; -newer than the stamp catches both new debs and rebuilt ones that
+# overwrote an existing filename, which a name diff would miss.
+HANDOFF_STAMP="$OUTPUT_DIR/.last-handoff"
+HANDOFF_TOTAL=0
+handoff() {
+  local label="$1" debs
+  mapfile -t debs < <(find "$OUTPUT_DIR" -maxdepth 1 -name '*.deb' -newer "$HANDOFF_STAMP" 2>/dev/null | sort)
+  if [ "$PUBLISH_ALL" -eq 1 ]; then
+    mapfile -t debs < <(find "$OUTPUT_DIR" -maxdepth 1 -name '*.deb' 2>/dev/null | sort)
+    PUBLISH_ALL=0   # only the first handoff of a run publishes history
+  fi
+  [ "${#debs[@]}" -gt 0 ] || { echo "[remote-build] $label: no new debs to hand off"; return 0; }
+  local next_stamp; next_stamp="$(mktemp)"
+  if [ "$PUBLISH" -eq 1 ]; then
+    wait_for_staging_clear
+    local ts tag; ts="$(date -u +%Y%m%d-%H%M%S)"; tag="staging-$ts"
+    echo "[remote-build] $label: creating staging prerelease $tag on $APT_REPO with ${#debs[@]} deb(s)"
+    if gh release create "$tag" -R "$APT_REPO" --prerelease --title "APT staging $ts" \
+         --notes "Build artifacts from $(hostname) $(date -u +%FT%TZ) ($label). Consumed + deleted by publish.yml." \
+         "${debs[@]}"; then
+      HANDOFF_TOTAL=$((HANDOFF_TOTAL + ${#debs[@]}))
+      mv "$next_stamp" "$HANDOFF_STAMP"
+    else
+      echo "[remote-build] ERROR: handoff of ${#debs[@]} deb(s) failed; they stay pending for the next handoff" >&2
+      rm -f "$next_stamp"; BUILD_FAILED=1
+    fi
+  else
+    echo "[remote-build] $label: --no-publish, ${#debs[@]} deb(s) left in $OUTPUT_DIR"
+    HANDOFF_TOTAL=$((HANDOFF_TOTAL + ${#debs[@]}))
+    mv "$next_stamp" "$HANDOFF_STAMP"
+  fi
+}
+
 # --- build ---
-# Marker for "what did THIS run produce". output/ is persistent and on a machine
-# that has built before it can hold thousands of debs from earlier runs; handing
-# all of them off would make publish.yml restage the entire history. -newer than
-# this stamp catches both new debs and rebuilt ones that overwrote an existing
-# filename, which a name-diff would miss.
-RUN_MARKER="$(mktemp)"
 # A failed package must not hide behind a successful docker exec: every mode
 # below records failures and sets BUILD_FAILED, the debs that did build are
 # still handed off, and the script exits non-zero at the very end.
 BUILD_FAILED=0
 mkdir -p "$OUTPUT_DIR"
 : > "$OUTPUT_DIR/remote-build.results"
+[ -e "$HANDOFF_STAMP" ] || touch -d '1970-01-01' "$HANDOFF_STAMP"
+touch "$HANDOFF_STAMP"   # this run hands off what THIS run writes
 case "$MODE" in
   queue)
-    echo "[remote-build] running full build queue"
-    docker exec "$CONTAINER" bash /home/builder/termux-packages/build-all-queue.sh || BUILD_FAILED=1
+    echo "[remote-build] running full build queue (UPDATES_ONLY=${UPDATES_ONLY:-} DRY_RUN=${DRY_RUN:-} handoff every ${HANDOFF_EVERY}m)"
+    docker exec -e UPDATES_ONLY="${UPDATES_ONLY:-}" -e DRY_RUN="${DRY_RUN:-}" "$CONTAINER" \
+      bash /home/builder/termux-packages/build-all-queue.sh &
+    QUEUE_PID=$!
+    if [ "$HANDOFF_EVERY" -gt 0 ]; then
+      while kill -0 "$QUEUE_PID" 2>/dev/null; do
+        for _ in $(seq "$HANDOFF_EVERY"); do kill -0 "$QUEUE_PID" 2>/dev/null || break; sleep 60; done
+        kill -0 "$QUEUE_PID" 2>/dev/null && handoff "interim"
+      done
+    fi
+    wait "$QUEUE_PID" || BUILD_FAILED=1
     ;;
   tier)
     echo "[remote-build] building tier file: $QUEUE_FILE"
@@ -133,34 +197,9 @@ case "$MODE" in
     ;;
 esac
 
-mapfile -t RUN_DEBS < <(find "$OUTPUT_DIR" -maxdepth 1 -name '*.deb' -newer "$RUN_MARKER" 2>/dev/null | sort)
-rm -f "$RUN_MARKER"
-DEB_COUNT="${#RUN_DEBS[@]}"
-DIR_TOTAL="$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.deb' 2>/dev/null | wc -l)"
-echo "[remote-build] this run produced $DEB_COUNT .deb file(s) ($DIR_TOTAL total in $OUTPUT_DIR)"
-if [ "$PUBLISH_ALL" -eq 1 ]; then
-  echo "[remote-build] --publish-all: handing off all $DIR_TOTAL deb(s) in $OUTPUT_DIR"
-  mapfile -t RUN_DEBS < <(find "$OUTPUT_DIR" -maxdepth 1 -name '*.deb' 2>/dev/null | sort)
-  DEB_COUNT="${#RUN_DEBS[@]}"
-fi
+handoff "final"
 if grep -q ':FAIL$' "$OUTPUT_DIR/remote-build.results" 2>/dev/null; then
   echo "[remote-build] FAILED packages: $(grep ':FAIL$' "$OUTPUT_DIR/remote-build.results" | cut -d: -f1 | tr '\n' ' ')"
 fi
-[ "$DEB_COUNT" -gt 0 ] || { echo "[remote-build] no debs produced; nothing to hand off"; exit "$BUILD_FAILED"; }
-
-# --- hand off to central publish ---
-if [ "$PUBLISH" -eq 1 ]; then
-  TS="$(date -u +%Y%m%d-%H%M%S)"
-  TAG="staging-$TS"
-  echo "[remote-build] creating staging prerelease $TAG on $APT_REPO"
-  gh release create "$TAG" \
-    -R "$APT_REPO" \
-    --prerelease \
-    --title "APT staging $TS" \
-    --notes "Build artifacts from $(hostname) $(date -u +%FT%TZ). Consumed + deleted by publish.yml." \
-    "${RUN_DEBS[@]}"
-  echo "[remote-build] handed off. publish.yml will stage, sign, and publish, then delete $TAG."
-else
-  echo "[remote-build] --no-publish: debs left in $OUTPUT_DIR"
-fi
+echo "[remote-build] done: $HANDOFF_TOTAL deb(s) handed off this run ($(find "$OUTPUT_DIR" -maxdepth 1 -name '*.deb' | wc -l) total in $OUTPUT_DIR)"
 exit "$BUILD_FAILED"
