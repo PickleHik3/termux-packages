@@ -34,7 +34,7 @@ BUILT_DIR=".built-packages"
 PKG_LOGS="output/pkg-logs"
 RESULTS_DIR="/tmp/build-results-$$"
 MAX_JOBS=1
-MAKE_JOBS=7  # container is capped at --cpus 6; quota+1 hides I/O stalls, more just throttles
+MAKE_JOBS=$(( $(nproc) + 1 ))  # one over nproc hides I/O stalls, more just throttles
 
 TIER1="build-tier1-libs.txt"
 TIER2="build-tier2-runtimes.txt"
@@ -123,7 +123,10 @@ wait_all() {
 launch() {
     local pkg="$1"
     (
-        if ./build-package.sh -j"$MAKE_JOBS" "$pkg" >> "$PKG_LOGS/$pkg.log" 2>&1; then
+        # -I downloads dependencies from the VAJ repo (repo.json) instead of
+        # building them; a dependency version the repo lacks is built and
+        # lands in output/ like any other package. -C frees disk as it goes.
+        if ./build-package.sh -I -C -a aarch64 -j"$MAKE_JOBS" "$pkg" >> "$PKG_LOGS/$pkg.log" 2>&1; then
             printf '%s:PASS\n' "$pkg" > "$RESULTS_DIR/result_${pkg}"
         else
             printf '%s:FAIL\n' "$pkg" > "$RESULTS_DIR/result_${pkg}"
@@ -131,12 +134,31 @@ launch() {
     ) &
 }
 
+# Cheap recipe version read for the skip test below. Handles the common
+# TERMUX_PKG_VERSION="x" / TERMUX_PKG_REVISION=n shape; anything fancier
+# (arrays, variables) returns empty and the package falls through to
+# build-package.sh, which does the authoritative already-built check itself.
+recipe_version() {
+    local f="packages/$1/build.sh" v r
+    [[ -f "$f" ]] || return 0
+    v=$(sed -nE 's/^TERMUX_PKG_VERSION=["'"'"']?([^"'"'"' $]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
+    [[ -z "$v" || "$v" == *'$'* || "$v" == '('* ]] && return 0
+    r=$(sed -nE 's/^TERMUX_PKG_REVISION=["'"'"']?([0-9]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
+    printf '%s%s' "$v" "${r:+-$r}"
+}
+
 build() {
-    local pkg="$1"
+    local pkg="$1" want
+    # The marker alone is not enough: markers are committed for the whole
+    # published catalogue, so an updated recipe must still get built. Skip
+    # only when the marker records the version the recipe asks for now.
     if [[ -e "$BUILT_DIR/$pkg" ]]; then
-        log "SKIP  $pkg"
-        SKIP_LIST+=("$pkg")
-        return 0
+        want=$(recipe_version "$pkg")
+        if [[ -n "$want" && "$(<"$BUILT_DIR/$pkg")" == "$want" ]]; then
+            log "SKIP  $pkg ($want)"
+            SKIP_LIST+=("$pkg")
+            return 0
+        fi
     fi
     wait_for_slot
     collect_results
@@ -174,3 +196,7 @@ log "FAIL  (${#FAIL_LIST[@]}): ${FAIL_LIST[*]:-none}"
 log "SKIP  (${#SKIP_LIST[@]}): ${SKIP_LIST[*]:-none}"
 
 rm -rf "$RESULTS_DIR"
+
+# Let the caller (remote-build.sh) see that something failed; the debs that
+# did build are still in output/ and still get handed off.
+[[ ${#FAIL_LIST[@]} -eq 0 ]]

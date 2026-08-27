@@ -88,30 +88,48 @@ docker exec "$CONTAINER" gpg --batch --quiet --import \
 # this stamp catches both new debs and rebuilt ones that overwrote an existing
 # filename, which a name-diff would miss.
 RUN_MARKER="$(mktemp)"
+# A failed package must not hide behind a successful docker exec: every mode
+# below records failures and sets BUILD_FAILED, the debs that did build are
+# still handed off, and the script exits non-zero at the very end.
+BUILD_FAILED=0
+mkdir -p "$OUTPUT_DIR"
+: > "$OUTPUT_DIR/remote-build.results"
 case "$MODE" in
   queue)
     echo "[remote-build] running full build queue"
-    docker exec "$CONTAINER" bash /home/builder/termux-packages/build-all-queue.sh
+    docker exec "$CONTAINER" bash /home/builder/termux-packages/build-all-queue.sh || BUILD_FAILED=1
     ;;
   tier)
     echo "[remote-build] building tier file: $QUEUE_FILE"
     docker exec "$CONTAINER" bash -c "
       cd /home/builder/termux-packages
+      failed=0
       while read -r pkg; do
         [ -z \"\$pkg\" ] && continue
         case \"\$pkg\" in \\#*) continue;; esac
-        TERMUX_BUILD_IGNORE_LOCK=true ./build-package.sh -I -C -a aarch64 \"\$pkg\"
+        if TERMUX_BUILD_IGNORE_LOCK=true ./build-package.sh -I -C -a aarch64 \"\$pkg\"; then
+          echo \"\$pkg:PASS\" >> output/remote-build.results
+        else
+          echo \"\$pkg:FAIL\" >> output/remote-build.results; failed=1
+        fi
       done < '$QUEUE_FILE'
-    "
+      exit \$failed
+    " || BUILD_FAILED=1
     ;;
   pkgs)
     echo "[remote-build] building packages: ${PKGS[*]}"
     docker exec "$CONTAINER" bash -c "
       cd /home/builder/termux-packages
+      failed=0
       for pkg in ${PKGS[*]}; do
-        TERMUX_BUILD_IGNORE_LOCK=true ./build-package.sh -I -C -a aarch64 \"\$pkg\"
+        if TERMUX_BUILD_IGNORE_LOCK=true ./build-package.sh -I -C -a aarch64 \"\$pkg\"; then
+          echo \"\$pkg:PASS\" >> output/remote-build.results
+        else
+          echo \"\$pkg:FAIL\" >> output/remote-build.results; failed=1
+        fi
       done
-    "
+      exit \$failed
+    " || BUILD_FAILED=1
     ;;
 esac
 
@@ -125,7 +143,10 @@ if [ "$PUBLISH_ALL" -eq 1 ]; then
   mapfile -t RUN_DEBS < <(find "$OUTPUT_DIR" -maxdepth 1 -name '*.deb' 2>/dev/null | sort)
   DEB_COUNT="${#RUN_DEBS[@]}"
 fi
-[ "$DEB_COUNT" -gt 0 ] || { echo "[remote-build] no debs produced; nothing to hand off"; exit 0; }
+if grep -q ':FAIL$' "$OUTPUT_DIR/remote-build.results" 2>/dev/null; then
+  echo "[remote-build] FAILED packages: $(grep ':FAIL$' "$OUTPUT_DIR/remote-build.results" | cut -d: -f1 | tr '\n' ' ')"
+fi
+[ "$DEB_COUNT" -gt 0 ] || { echo "[remote-build] no debs produced; nothing to hand off"; exit "$BUILD_FAILED"; }
 
 # --- hand off to central publish ---
 if [ "$PUBLISH" -eq 1 ]; then
@@ -142,3 +163,4 @@ if [ "$PUBLISH" -eq 1 ]; then
 else
   echo "[remote-build] --no-publish: debs left in $OUTPUT_DIR"
 fi
+exit "$BUILD_FAILED"
