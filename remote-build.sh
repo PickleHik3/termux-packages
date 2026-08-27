@@ -147,8 +147,11 @@ handoff() {
 BUILD_FAILED=0
 mkdir -p "$OUTPUT_DIR"
 : > "$OUTPUT_DIR/remote-build.results"
-[ -e "$HANDOFF_STAMP" ] || touch -d '1970-01-01' "$HANDOFF_STAMP"
-touch "$HANDOFF_STAMP"   # this run hands off what THIS run writes
+# First run on a machine: hand off only what this run writes (a primary host
+# can hold thousands of historical debs in output/). Later runs keep the stamp
+# so debs built after the last successful handoff of an interrupted run are
+# still handed off instead of silently stranded.
+[ -e "$HANDOFF_STAMP" ] || touch "$HANDOFF_STAMP"
 case "$MODE" in
   queue)
     echo "[remote-build] running full build queue (UPDATES_ONLY=${UPDATES_ONLY:-} DRY_RUN=${DRY_RUN:-} handoff every ${HANDOFF_EVERY}m)"
