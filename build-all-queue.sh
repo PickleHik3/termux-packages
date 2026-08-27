@@ -13,8 +13,17 @@
 # Builds are serialized because termux-package-build writes every package into
 # one shared TERMUX_PREFIX before timestamp-based payload collection. Running
 # packages concurrently can leak one package's files into another package.
-# Fully resumable: pre-populates .built-packages from output/ on every start.
+# What to build is decided against the LIVE repo index (repo.json URL), not
+# against the committed .built-packages/ markers: a package is skipped only
+# when the published version equals the recipe's version, so an upstream
+# merge makes exactly the stale packages rebuild. Debs already in output/
+# count as built for this session (resumable).
 # Per-package logs: output/pkg-logs/<pkg>.log
+#
+# Env knobs:
+#   UPDATES_ONLY=1  only rebuild packages that are already published (skip
+#                   never-published additions) -- run this first after a merge
+#   DRY_RUN=1       log every BUILD/SKIP decision, launch nothing
 
 set -u
 cd /home/builder/termux-packages
@@ -30,7 +39,6 @@ trap 'rm -f "$PIDFILE"' EXIT
 
 LOG="output/build-all-queue.log"
 OUTDIR="output"
-BUILT_DIR=".built-packages"
 PKG_LOGS="output/pkg-logs"
 RESULTS_DIR="/tmp/build-results-$$"
 MAX_JOBS=1
@@ -62,10 +70,28 @@ chmod +x /home/builder/bin/apt
 export PATH="/home/builder/bin:$PATH"
 
 # ---------------------------------------------------------------------------
-# Pre-populate .built-packages from all existing output/ .debs.
+# Published versions from the live repo index -- the source of truth for
+# "is this already done". Abort if it cannot be fetched: without it every
+# package would look stale and the run would rebuild the whole catalogue.
 # ---------------------------------------------------------------------------
-log "=== Pre-populating .built-packages from output/ ==="
-mkdir -p "$BUILT_DIR"
+REPO_URL=$(sed -nE 's/^\s*"url":\s*"([^"]+)".*/\1/p' repo.json | head -1)
+REPO_DIST=$(sed -nE 's/^\s*"distribution":\s*"([^"]+)".*/\1/p' repo.json | head -1)
+REPO_COMP=$(sed -nE 's/^\s*"component":\s*"([^"]+)".*/\1/p' repo.json | head -1)
+PUBLISHED_TSV="$OUTDIR/published.tsv"
+mkdir -p "$OUTDIR"
+log "=== Fetching published index from $REPO_URL ($REPO_DIST/$REPO_COMP) ==="
+if ! curl -fsSL --retry 3 "$REPO_URL/dists/$REPO_DIST/$REPO_COMP/binary-aarch64/Packages.gz" \
+        | gzip -dc | awk '/^Package:/{p=$2} /^Version:/{print p, $2}' | sort -u > "$PUBLISHED_TSV" \
+        || [[ ! -s "$PUBLISHED_TSV" ]]; then
+    log "ERROR: could not fetch the published index; refusing to guess what is stale"
+    exit 1
+fi
+declare -A PUBLISHED=()
+while read -r _n _v; do PUBLISHED[$_n]=$_v; done < "$PUBLISHED_TSV"
+log "Published index: ${#PUBLISHED[@]} packages"
+
+# Debs already in output/ were built by an earlier (interrupted) run.
+declare -A SESSION_BUILT=()
 shopt -s nullglob
 for deb in "$OUTDIR"/*.deb; do
     fname="${deb##*/}"
@@ -73,10 +99,18 @@ for deb in "$OUTDIR"/*.deb; do
     rest="${fname#*_}"
     ver="${rest%%_*}"
     [[ -z "$name" || -z "$ver" ]] && continue
-    echo "$ver" > "$BUILT_DIR/$name"
+    SESSION_BUILT[$name]=$ver
 done
 shopt -u nullglob
-log "Pre-populated $(ls "$BUILT_DIR" | wc -l) entries in $BUILT_DIR"
+log "Already in output/: ${#SESSION_BUILT[@]} packages"
+
+declare -A EXCLUDED=()
+if [[ -f build-exclusions.txt ]]; then
+    while IFS= read -r _n; do
+        [[ -z "$_n" || "$_n" == \#* ]] && continue
+        EXCLUDED[${_n%% *}]=1
+    done < build-exclusions.txt
+fi
 
 declare -a PASS_LIST=() FAIL_LIST=() SKIP_LIST=()
 
@@ -148,21 +182,38 @@ recipe_version() {
 }
 
 build() {
-    local pkg="$1" want
-    # The marker alone is not enough: markers are committed for the whole
-    # published catalogue, so an updated recipe must still get built. Skip
-    # only when the marker records the version the recipe asks for now.
-    if [[ -e "$BUILT_DIR/$pkg" ]]; then
-        want=$(recipe_version "$pkg")
-        if [[ -n "$want" && "$(<"$BUILT_DIR/$pkg")" == "$want" ]]; then
-            log "SKIP  $pkg ($want)"
-            SKIP_LIST+=("$pkg")
-            return 0
+    local pkg="$1" want have
+    if [[ -n "${EXCLUDED[$pkg]:-}" ]]; then
+        log "SKIP  $pkg (build-exclusions.txt)"
+        SKIP_LIST+=("$pkg"); return 0
+    fi
+    if [[ ! -d "packages/$pkg" ]]; then
+        log "SKIP  $pkg (no recipe -- removed upstream or a subpackage)"
+        SKIP_LIST+=("$pkg"); return 0
+    fi
+    want=$(recipe_version "$pkg")
+    have="${PUBLISHED[$pkg]:-}"
+    if [[ -z "$have" && -n "${UPDATES_ONLY:-}" ]]; then
+        log "SKIP  $pkg (never published; UPDATES_ONLY)"
+        SKIP_LIST+=("$pkg"); return 0
+    fi
+    if [[ -n "$want" ]]; then
+        if [[ "$have" == "$want" ]]; then
+            log "SKIP  $pkg ($want published)"
+            SKIP_LIST+=("$pkg"); return 0
         fi
+        if [[ "${SESSION_BUILT[$pkg]:-}" == "$want" ]]; then
+            log "SKIP  $pkg ($want already in output/)"
+            SKIP_LIST+=("$pkg"); return 0
+        fi
+    fi
+    if [[ -n "${DRY_RUN:-}" ]]; then
+        log "BUILD $pkg (${have:-unpublished} -> ${want:-?})"
+        PASS_LIST+=("$pkg"); return 0
     fi
     wait_for_slot
     collect_results
-    log "START $pkg"
+    log "START $pkg (${have:-unpublished} -> ${want:-?})"
     launch "$pkg"
 }
 
@@ -188,6 +239,26 @@ while IFS= read -r pkg; do
     [[ -z "$pkg" || "$pkg" == \#* ]] && continue
     build "$pkg"
 done < "$TIER3"
+wait_all
+
+# Published packages that no tier file lists must still get their updates.
+declare -A QUEUED=()
+for f in "$TIER1" "$TIER2" "$TIER3"; do
+    while IFS= read -r pkg; do
+        [[ -z "$pkg" || "$pkg" == \#* ]] && continue
+        QUEUED[$pkg]=1
+    done < "$f"
+done
+EXTRA=()
+for pkg in "${!PUBLISHED[@]}"; do
+    [[ -n "${QUEUED[$pkg]:-}" ]] && continue
+    [[ -d "packages/$pkg" ]] || continue
+    EXTRA+=("$pkg")
+done
+log "--- Tier 4: Published packages missing from the tier files (${#EXTRA[@]} packages) ---"
+for pkg in $(printf '%s\n' "${EXTRA[@]}" | sort); do
+    build "$pkg"
+done
 wait_all
 
 log "=== build-all-queue DONE ==="
