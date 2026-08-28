@@ -96,6 +96,19 @@ termux_force_check_package_dependency() {
 
 termux_run_build-package() {
 	local set_library
+
+	# VAJ: build-exclusions.txt gates the top-level loop in build-all-queue.sh,
+	# but nothing stopped an excluded package from arriving here as somebody
+	# else's dependency -- the repo download above just fails and falls through
+	# to "building instead". dotnet9.0 came in that way behind jellyfin-server
+	# on 2026-08-28 and sat 3 h at 0 % CPU on a zombie MSBuild server. A package
+	# is on that list because we cannot build it, so fail the parent fast rather
+	# than pretend otherwise. Set VAJ_IGNORE_BUILD_EXCLUSIONS=1 to override.
+	if [[ -z "${VAJ_IGNORE_BUILD_EXCLUSIONS:-}" && -f "$TERMUX_SCRIPTDIR/build-exclusions.txt" ]] &&
+		awk -v p="$PKG" '$1 == p { found = 1 } END { exit !found }' \
+			"$TERMUX_SCRIPTDIR/build-exclusions.txt"; then
+		termux_error_exit "Refusing to build '$PKG' as a dependency: it is listed in build-exclusions.txt. Publish it to $TERMUX_REPO_URL or drop the exclusion."
+	fi
 	if [[ "$TERMUX_GLOBAL_LIBRARY" = "true" ]]; then
 		set_library="$TERMUX_PACKAGE_LIBRARY -L"
 	else
