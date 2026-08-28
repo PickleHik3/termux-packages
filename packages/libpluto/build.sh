@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Shared library for the Pluto interpreter"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="Komo @mbekkomo"
 TERMUX_PKG_VERSION="0.13.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://github.com/PlutoLang/Pluto/archive/refs/tags/${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=8d49ad7cae82b278efb2080e394ce32ffe2341a93fb91ec74094a444c1a8dae8
 TERMUX_PKG_AUTO_UPDATE=true

@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Netfilter library providing interface to the nf_tables s
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="1.3.1"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://netfilter.org/projects/libnftnl/files/libnftnl-$TERMUX_PKG_VERSION.tar.xz
 TERMUX_PKG_SHA256=607da28dba66fbdeccf8ef1395dded9077e8d19f2995f9a4d45a9c2f0bcffba8
 TERMUX_PKG_AUTO_UPDATE=true

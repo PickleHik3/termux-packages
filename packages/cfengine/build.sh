@@ -4,6 +4,7 @@ TERMUX_PKG_DESCRIPTION="CFEngine is a configuration management technology"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION=1:3.27.1
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="git+https://github.com/cfengine/core"
 TERMUX_PKG_SHA256=62ecb071fcc2fd57ffd30e9fbea81260334fec63ebe6d1d91306cd8b6938acb4
 # "-build[n]" suffix in tag name is not a part of version string.

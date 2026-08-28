@@ -6,6 +6,7 @@ TERMUX_PKG_VERSION=(
 	3.10.0
 	1.18
 )
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=(
 	"https://github.com/beyondgrep/ack3/archive/refs/tags/v${TERMUX_PKG_VERSION[0]}.tar.gz"
 	"https://github.com/petdance/file-next/archive/refs/tags/${TERMUX_PKG_VERSION[1]}.tar.gz"
