@@ -134,9 +134,9 @@ handoff() {
       rm -f "$next_stamp"; BUILD_FAILED=1
     fi
   else
-    echo "[remote-build] $label: --no-publish, ${#debs[@]} deb(s) left in $OUTPUT_DIR"
-    HANDOFF_TOTAL=$((HANDOFF_TOTAL + ${#debs[@]}))
-    mv "$next_stamp" "$HANDOFF_STAMP"
+    # Not handed off, so still pending: leave the stamp where it was.
+    echo "[remote-build] $label: --no-publish, ${#debs[@]} deb(s) left pending in $OUTPUT_DIR"
+    rm -f "$next_stamp"
   fi
 }
 
