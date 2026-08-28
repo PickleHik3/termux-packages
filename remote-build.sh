@@ -24,7 +24,7 @@
 #   ./remote-build.sh ... --handoff-every N # in queue mode, also hand off finished debs every N
 #                                           # minutes while the queue runs (default 60; 0 = end only)
 #
-# Queue mode honours UPDATES_ONLY=1 and DRY_RUN=1 (see build-all-queue.sh).
+# Queue mode honours UPDATES_ONLY=1, DRY_RUN=1 and PKG_TIMEOUT (see build-all-queue.sh).
 set -euo pipefail
 
 IMAGE="${VAJ_BUILDER_IMAGE:-io-vaj-phase0a-builder:c9cc6b28}"
@@ -154,8 +154,9 @@ mkdir -p "$OUTPUT_DIR"
 [ -e "$HANDOFF_STAMP" ] || touch "$HANDOFF_STAMP"
 case "$MODE" in
   queue)
-    echo "[remote-build] running full build queue (UPDATES_ONLY=${UPDATES_ONLY:-} DRY_RUN=${DRY_RUN:-} handoff every ${HANDOFF_EVERY}m)"
-    docker exec -e UPDATES_ONLY="${UPDATES_ONLY:-}" -e DRY_RUN="${DRY_RUN:-}" "$CONTAINER" \
+    echo "[remote-build] running full build queue (UPDATES_ONLY=${UPDATES_ONLY:-} DRY_RUN=${DRY_RUN:-} PKG_TIMEOUT=${PKG_TIMEOUT:-8h} handoff every ${HANDOFF_EVERY}m)"
+    docker exec -e UPDATES_ONLY="${UPDATES_ONLY:-}" -e DRY_RUN="${DRY_RUN:-}" \
+      -e PKG_TIMEOUT="${PKG_TIMEOUT:-}" "$CONTAINER" \
       bash /home/builder/termux-packages/build-all-queue.sh &
     QUEUE_PID=$!
     if [ "$HANDOFF_EVERY" -gt 0 ]; then
