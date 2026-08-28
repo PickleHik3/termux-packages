@@ -49,3 +49,4 @@ virglrenderer
 vlc
 whitebox-tools
 zeronet
+dotnet9.0

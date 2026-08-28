@@ -24,6 +24,7 @@
 #   UPDATES_ONLY=1  only rebuild packages that are already published (skip
 #                   never-published additions) -- run this first after a merge
 #   DRY_RUN=1       log every BUILD/SKIP decision, launch nothing
+#   PKG_TIMEOUT=8h  per-package wall-clock limit (GNU timeout syntax)
 
 set -u
 cd /home/builder/termux-packages
@@ -160,7 +161,10 @@ launch() {
         # -I downloads dependencies from the VAJ repo (repo.json) instead of
         # building them; a dependency version the repo lacks is built and
         # lands in output/ like any other package. -C frees disk as it goes.
-        if ./build-package.sh -I -C -a aarch64 -j"$MAKE_JOBS" "$pkg" >> "$PKG_LOGS/$pkg.log" 2>&1; then
+        # A hung build (dotnet9.0 sat 1.5 h at 0 % CPU on a zombie MSBuild
+        # server) must not stall the whole queue: bound every package.
+        if timeout -k 60 "${PKG_TIMEOUT:-8h}" \
+             ./build-package.sh -I -C -a aarch64 -j"$MAKE_JOBS" "$pkg" >> "$PKG_LOGS/$pkg.log" 2>&1; then
             printf '%s:PASS\n' "$pkg" > "$RESULTS_DIR/result_${pkg}"
         else
             printf '%s:FAIL\n' "$pkg" > "$RESULTS_DIR/result_${pkg}"
