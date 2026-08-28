@@ -57,14 +57,16 @@ termux_step_install_license() {
 			done
 		done
 
-		# Add *.md, *.rst and *.txt variants of the filenames
-		for LICENSE in "${COMMON_LICENSE_FILES[@]}"; do
-			COMMON_LICENSE_FILES+=("$LICENSE"{.md,.rst,.txt}) # times 4
-		done
-
 		# Add Uppercase and UPPESTCASE variants of the filenames
 		for LICENSE in "${COMMON_LICENSE_FILES[@]@u}" "${COMMON_LICENSE_FILES[@]@U}"; do
 			COMMON_LICENSE_FILES+=("$LICENSE") # times 3
+		done
+
+		# Add *.md, *.rst and *.txt variants of the filenames -- AFTER the case
+		# step, so that LICENSE.md / LICENSE.txt (the common spelling: c-ares,
+		# numpy, esbuild, pip) are covered and not only LICENSE.MD / LICENSE.TXT.
+		for LICENSE in "${COMMON_LICENSE_FILES[@]}"; do
+			COMMON_LICENSE_FILES+=("$LICENSE"{.md,.rst,.txt}) # times 4
 		done
 
 		for LICENSE in "${LICENSES[@]}"; do
