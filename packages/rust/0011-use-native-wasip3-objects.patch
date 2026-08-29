@@ -1,0 +1,33 @@
+wasi-libc (wasi-sdk-34) now ships native wasm32-wasip3 objects, so bootstrap's
+wasip2 fallback -- and the assert guarding it -- must go. rust's own comment
+says exactly this: "Once wasi-libc supports wasip3 this should be deleted and
+the native objects should be used."
+
+Left in place, the assert aborts the build:
+
+    thread 'main' panicked at src/bootstrap/src/core/build_steps/compile.rs:445:13:
+    wasip3 support is in wasi-libc, this should be updated now
+
+Verified against wasi-libc 34: share/wasi-sysroot/lib/wasm32-wasip3/ carries
+libc.a, crt1-command.o, crt1-reactor.o and eh/ -- every object this code path
+copies -- with the same 71-file layout as wasip1 and wasip2.
+
+Drop when upstream rust removes the special case itself.
+--- a/src/bootstrap/src/core/build_steps/compile.rs
++++ b/src/bootstrap/src/core/build_steps/compile.rs
+@@ -438,15 +438,6 @@
+             )
+         });
+ 
+-        // wasm32-wasip3 doesn't exist in wasi-libc yet, so instead use libs
+-        // from the wasm32-wasip2 target. Once wasi-libc supports wasip3 this
+-        // should be deleted and the native objects should be used.
+-        let srcdir = if target == "wasm32-wasip3" {
+-            assert!(!srcdir.exists(), "wasip3 support is in wasi-libc, this should be updated now");
+-            builder.wasi_libdir(TargetSelection::from_user("wasm32-wasip2")).unwrap()
+-        } else {
+-            srcdir
+-        };
+         for &obj in &["libc.a", "crt1-command.o", "crt1-reactor.o"] {
+             copy_and_stamp(
+                 builder,
