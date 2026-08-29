@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="Library for configuring and customizing font access"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="2.18.3"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/$TERMUX_PKG_VERSION/fontconfig-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=9ae01e1d53acdef56010c5451cd34aa41d325b2faccd8606448d8fa01b2496b3
 TERMUX_PKG_AUTO_UPDATE=true

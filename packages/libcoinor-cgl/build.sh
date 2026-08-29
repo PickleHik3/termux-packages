@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="An open-source cut generation library for COIN-OR projec
 TERMUX_PKG_LICENSE="EPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="0.60.10"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/coin-or/Cgl/archive/refs/tags/releases/${TERMUX_PKG_VERSION#*:}.tar.gz
 TERMUX_PKG_SHA256=41b7ac9402db883d9c487eb7101e59eb513cefd726e6e7a669dc94664d9385e6
 TERMUX_PKG_AUTO_UPDATE=true

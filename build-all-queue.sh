@@ -45,6 +45,37 @@ RESULTS_DIR="/tmp/build-results-$$"
 MAX_JOBS=1
 MAKE_JOBS=$(( $(nproc) + 1 ))  # one over nproc hides I/O stalls, more just throttles
 
+# ---------------------------------------------------------------------------
+# Stale .la purge.
+#
+# build-package.sh -I sets RM_ALL_PKGS_BUILT_MARKER_AND_INSTALL_FILES=false, so
+# every package built earlier in the run leaves its whole staging install in the
+# shared prefix -- including the .la files that only belong in a -static
+# subpackage and are therefore absent on a real install.
+#
+# libtool notices them. Where upstream records a plain `-lfoo` it writes the
+# absolute path of the leaked libfoo.la into the next package's
+# dependency_libs, and that path never exists at install time, so every libtool
+# consumer downstream dies with "... is not a valid libtool archive".
+# Measured 2026-08-29: 78 published packages, 364 bad references. libseccomp
+# built earlier in a run was enough to poison libmagic; libSM.la poisoned by
+# libuuid.la took out libvips and dmtx-utils.
+#
+# Serial builds did not fix this -- it is prefix persistence across packages,
+# not concurrency. Purge before every build so libtool sees what upstream sees.
+# ---------------------------------------------------------------------------
+STATIC_LA_LIST="vaj-static-la.txt"
+TERMUX_PREFIX_DIR="/data/data/$(awk -F'"' '/^TERMUX_APP__PACKAGE_NAME=/{print $2; exit}' scripts/properties.sh)/files/usr"
+
+purge_static_la() {
+    [[ -f "$STATIC_LA_LIST" && -d "$TERMUX_PREFIX_DIR" ]] || return 0
+    local rel
+    while IFS= read -r rel; do
+        [[ -z "$rel" || "$rel" == \#* ]] && continue
+        rm -f "$TERMUX_PREFIX_DIR/$rel"
+    done < "$STATIC_LA_LIST"
+}
+
 TIER1="build-tier1-libs.txt"
 TIER2="build-tier2-runtimes.txt"
 TIER3="build-tier3-tools.txt"
@@ -158,6 +189,9 @@ wait_all() {
 launch() {
     local pkg="$1"
     (
+        # Drop .la files leaked into the shared prefix by earlier packages in
+        # this run before libtool can bake their paths into this one.
+        purge_static_la
         # -I downloads dependencies from the VAJ repo (repo.json) instead of
         # building them; a dependency version the repo lacks is built and
         # lands in output/ like any other package. -C frees disk as it goes.
