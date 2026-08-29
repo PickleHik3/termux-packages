@@ -4,7 +4,10 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION=2.0.0
 TERMUX_PKG_REVISION=8
-TERMUX_PKG_SRCURL=https://www.digital-scurf.org/files/libgfshare/libgfshare-$TERMUX_PKG_VERSION.tar.bz2
+# Upstream digital-scurf.org 404s as of 2026-08-29; this Wayback capture is a
+# byte-exact copy of the original tarball -- TERMUX_PKG_SHA256 below is unchanged
+# and still verifies it.
+TERMUX_PKG_SRCURL=https://web.archive.org/web/2020id_/https://www.digital-scurf.org/files/libgfshare/libgfshare-$TERMUX_PKG_VERSION.tar.bz2
 TERMUX_PKG_SHA256=86f602860133c828356b7cf7b8c319ba9b27adf70a624fe32275ba1ed268331f
 TERMUX_PKG_BREAKS="libgfshare-dev"
 TERMUX_PKG_REPLACES="libgfshare-dev"
