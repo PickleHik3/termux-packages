@@ -41,8 +41,13 @@ lib/python${_MAJOR_VERSION}/*/tests
 "
 
 termux_step_host_build() {
+	# Include/asdl.h does "typedef enum {false, true} bool;", and all three of those
+	# are keywords in C23, which the host gcc now defaults to:
+	#   error: cannot use keyword 'false' as enumeration constant
+	# Python 2 is long EOL and will never be fixed upstream, so pin the host build to
+	# gnu17.
 	# We need a host-built Parser/pgen binary, copied into cross-compile build in termux_step_post_configure() below
-	$TERMUX_PKG_SRCDIR/configure
+	$TERMUX_PKG_SRCDIR/configure CFLAGS="-std=gnu17"
 	make Parser/pgen
 	# We need a python$_MAJOR_VERSION binary to be picked up by configure check:
 	make
