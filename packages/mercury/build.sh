@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="A logic/functional programming language"
 TERMUX_PKG_LICENSE="GPL-2.0, LGPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="22.01.8"
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=https://dl.mercurylang.org/release/mercury-srcdist-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=a097e8cc8eca0152ed9527c1caf73e5c9c83f6ada1d313a25b80fe79072fbad8
 TERMUX_PKG_AUTO_UPDATE=true
@@ -38,6 +38,19 @@ termux_step_host_build() {
 	./configure \
 		CC="gcc -m${TERMUX_ARCH_BITS}" CXX="g++ -m${TERMUX_ARCH_BITS}" \
 		$TERMUX_PKG_EXTRA_CONFIGURE_ARGS
+
+	# scripts/mgnuc compiles the bootstrap runtime with -Werror, and current gcc
+	# reports the strrchr() results in mercury_trace_base.c and mercury_wrapper.c
+	# under -Wdiscarded-qualifiers. mgnuc assembles the command line as
+	# "$CC $ALL_CC_OPTS $@ $OVERRIDE_OPTS", so nothing we can set from outside lands
+	# after its own -Werror -- CC comes first and OVERRIDE_OPTS is internal. Exempt
+	# just that one diagnostic in the generated script; every other warning stays
+	# fatal. Only the gcc branch matters here, since the host build sets CC=gcc.
+	local _halt='COMPILER_HALT_AT_WARN_OPT="-Werror"'
+	grep -q "$_halt" scripts/mgnuc ||
+		termux_error_exit "mercury: '$_halt' not found in generated scripts/mgnuc; the -Werror workaround needs revisiting."
+	sed -i "s/$_halt/COMPILER_HALT_AT_WARN_OPT=\"-Werror -Wno-error=discarded-qualifiers\"/g" scripts/mgnuc
+
 	make -j $TERMUX_PKG_MAKE_PROCESSES
 }
 
