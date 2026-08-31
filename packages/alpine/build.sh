@@ -21,6 +21,11 @@ TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --with-ssl-key-dir=$TERMUX_PREFIX/etc/ssl/private
 "
 TERMUX_PKG_BUILD_IN_SRC=true
+# The bundled c-client is not parallel-safe: it materialises osdepbas.c and
+# osdeplog.c with "ln -s os_lnx.c osdepbas.c" from one rule while another already
+# wants to compile them, so under -j the compile can win the race and c-client
+# aborts with "osdepbas.c not found...try make clean and new make".
+TERMUX_PKG_MAKE_PROCESSES=1
 
 termux_step_pre_configure() {
 	export TCC=$CC
