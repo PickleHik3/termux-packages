@@ -1,0 +1,21 @@
+conio.c uses tcgetattr/tcsetattr/tcflush/TCSANOW but includes only <curses.h>
+and <term.h>. ncurses' term.h does include <termios.h>, but only inside its
+"#ifdef NCURSES_INTERNALS" block (term.h:93-151), so a normal consumer never
+gets it: struct termios stays incomplete and the tc* functions are undeclared.
+
+Reproduced against this ncurses: curses.h + term.h alone gives 4 errors
+(incomplete struct termios, undeclared tcgetattr/tcsetattr, undeclared
+TCSANOW); adding <termios.h> gives 0. Note this is not an API-level issue --
+bionic declares all three at API 24, which is what we target.
+
+--- a/src/console/conio.c
++++ b/src/console/conio.c
+@@ -56,6 +56,8 @@
+ 
+ #include <curses.h>
+ #include <term.h>
++/* ncurses only pulls <termios.h> in from term.h under NCURSES_INTERNALS. */
++#include <termios.h>
+ 
+ #ifdef HAVE_SUN_OS
+ #ifndef _TERM_H
