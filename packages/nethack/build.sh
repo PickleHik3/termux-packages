@@ -21,6 +21,11 @@ termux_step_host_build() {
 	else
 		HOST_CC="gcc"
 	fi
+	# These host tools are compiled with -DNOTPARMDECL, so unixconf.h declares
+	# srand48() and sleep() with empty parameter lists. Under C23 that means "takes no
+	# parameters", which collides with glibc's real prototypes -- "conflicting types
+	# for 'srand48'". gnu17 restores the old "unspecified parameters" meaning.
+	HOST_CC="$HOST_CC -std=gnu17"
 	CFLAGS="" CC="$HOST_CC" LD="ld" make makedefs
 	CFLAGS="" CC="$HOST_CC" LD="ld" make lev_comp
 	CFLAGS="" CC="$HOST_CC" LD="ld" make dgn_comp dlb recover
