@@ -76,6 +76,32 @@ purge_static_la() {
     done < "$STATIC_LA_LIST"
 }
 
+# Build backends that shell out to cmake or ninja prefer an installed python
+# module of that name over anything on PATH. When an earlier package pip-installs
+# the PyPI cmake/ninja wheels into the *target* site-packages, their BIN_DIR
+# points at $TERMUX_PREFIX/bin, so scikit-build-core hands the cross build the
+# aarch64 cmake and dies with "Exec format error" (sabnzbd, python-sabyenc3).
+# These wheels are never owned by a package -- their INSTALLER is "pip" -- so
+# drop any that no .list file claims.
+purge_pip_buildtool_shadows() {
+    [[ -d "$TERMUX_PREFIX_DIR" ]] || return 0
+    local sp dist name
+    for sp in "$TERMUX_PREFIX_DIR"/lib/python*/site-packages; do
+        [[ -d "$sp" ]] || continue
+        for name in cmake ninja; do
+            [[ -e "$sp/$name" ]] || continue
+            # Leave anything a package actually ships alone.
+            if grep -qs "site-packages/$name/" "$TERMUX_PREFIX_DIR"/var/lib/dpkg/info/*.list; then
+                continue
+            fi
+            rm -rf "$sp/$name"
+            for dist in "$sp/$name"-*.dist-info; do
+                [[ -d "$dist" ]] && rm -rf "$dist"
+            done
+        done
+    done
+}
+
 TIER1="build-tier1-libs.txt"
 TIER2="build-tier2-runtimes.txt"
 TIER3="build-tier3-tools.txt"
@@ -192,6 +218,9 @@ launch() {
         # Drop .la files leaked into the shared prefix by earlier packages in
         # this run before libtool can bake their paths into this one.
         purge_static_la
+        # Likewise for pip-installed cmake/ninja wheels, which shadow the host
+        # build tools for any cross build that goes through scikit-build-core.
+        purge_pip_buildtool_shadows
         # -I downloads dependencies from the VAJ repo (repo.json) instead of
         # building them; a dependency version the repo lacks is built and
         # lands in output/ like any other package. -C frees disk as it goes.
