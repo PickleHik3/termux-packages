@@ -9,10 +9,13 @@ TERMUX_PKG_SRCURL=https://github.com/jonmacs/jove/archive/refs/tags/${TERMUX_PKG
 TERMUX_PKG_SHA256=ca5a5fcf71009c7389d655d1f1ae8139710f6cc531be95581e4b375e67f098d2
 TERMUX_PKG_DEPENDS="ncurses"
 TERMUX_PKG_BUILD_IN_SRC=true
+# setmaps is built with the host compiler (LOCALCC), and jove.h does
+# `typedef int bool`, which the host gcc rejects now that it defaults to C23.
 TERMUX_PKG_EXTRA_MAKE_ARGS="
 JOVEHOME=$TERMUX_PREFIX
 SYSDEFS=-DLinux
 LDLIBS=-lncursesw
+LOCALCFLAGS=-std=gnu17
 "
 
 termux_step_post_massage() {

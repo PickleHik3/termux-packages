@@ -16,6 +16,9 @@ termux_step_configure() {
 
 termux_step_make() {
 	cd src/
+	# The Makefile only adds -I.../include/OpenEXR, but OpenEXR 3 headers include
+	# the Imath ones unqualified and Imath installs into its own subdirectory.
+	CXXFLAGS+=" $(pkg-config --cflags Imath)"
 	make STRIP="$STRIP" OPT_CFLAGS="$CXXFLAGS" cli cli_gm
 }
 
