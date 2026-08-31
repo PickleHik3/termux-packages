@@ -9,3 +9,13 @@ TERMUX_PKG_DEPENDS="git"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 TERMUX_PKG_AUTO_UPDATE=true
+
+termux_step_post_configure() {
+	# AX_AM_MACROS rewrites aminclude.am from configure, and Makefile.in lists it as a
+	# prerequisite, so after configure the shipped Makefile.in always looks stale. That
+	# fires automake's maintainer rule, which runs build-aux/missing automake-1.16 --
+	# a version the builder does not have. The generated files are fine as shipped, so
+	# just restamp them past aminclude.am.
+	touch Makefile.in
+	touch Makefile
+}

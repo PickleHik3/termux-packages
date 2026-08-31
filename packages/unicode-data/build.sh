@@ -8,9 +8,13 @@ TERMUX_PKG_SRCURL=(
 	https://unicode.org/Public/${TERMUX_PKG_VERSION}/ucd/UCD.zip
 	https://unicode.org/Public/${TERMUX_PKG_VERSION}/ucd/Unihan.zip
 )
+# Unicode repacked both archives in place on 2026-08-07 (files inside are stamped
+# 2026-08-08 and 2026-07-31). Verified: UnicodeData, Blocks, Scripts, DerivedAge,
+# PropList, LineBreak, NameAliases and CaseFolding inside UCD.zip are byte-identical
+# to the same files published individually under 18.0.0/ucd/.
 TERMUX_PKG_SHA256=(
-	c961d4405edd144b5052cfaf8bf7db54af44ebc5db7181f83c6c52df99e9363a
-	835593ec1ca206486cdef6860a41930343ac014d7d61f7f7ef2b25084fadbdd4
+	c602dfedfa5863b4b75e8bc0b390007e54d437b23b36a6298f301484bd4c0312
+	4c93ea9c1f636451729a840978f1667a53886af37ba854fdcce109721c63d43e
 )
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 TERMUX_PKG_AUTO_UPDATE=true

@@ -4,7 +4,10 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_VERSION="1.4.12"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_SRCURL="https://github.com/so-fancy/diff-so-fancy/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=438cccf785cc8ac1575a81ca606afdbb8a4de8f860136d9f26a1807b00903f5d
+# Upstream moved the v1.4.12 tag between creating it (2026-07-15) and publishing the
+# release (2026-08-16). Verified: this tarball is byte-identical to the tree at
+# cf34da2098854b3a8733179574c7325d0a1861be, which is the head of both master and next.
+TERMUX_PKG_SHA256=6f6b6e8910821766ce55a99fd5d6c960f1943440738a36b12b66a7165188ce7d
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_TAG_TYPE="newest-tag"
 TERMUX_PKG_DEPENDS="perl"

@@ -3,7 +3,7 @@ TERMUX_PKG_DESCRIPTION="Lightweight PDF and XPS viewer (library)"
 TERMUX_PKG_LICENSE="AGPL-3.0-or-later"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="1.28.2"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL="https://mupdf.com/downloads/archive/mupdf-${TERMUX_PKG_VERSION}-source.tar.gz"
 TERMUX_PKG_SHA256=44075a84e329db55b9bef5f342a70fd26d69e48ad1d33cb89d9664581c641156
 TERMUX_PKG_DEPENDS="brotli, freetype, gumbo-parser, harfbuzz, jbig2dec, leptonica, libandroid-shmem, libc++, libjpeg-turbo, openjpeg, tesseract, zlib"
@@ -15,6 +15,9 @@ TERMUX_PKG_MAKE_PROCESSES=1
 TERMUX_PKG_BUILD_IN_SRC=true
 # Automatic updates break k2pdfopt on regular basis
 TERMUX_PKG_AUTO_UPDATE=false
+# Makerules defaults HAVE_GLUT to `pkg-config --exists gl x11 xrandr`, which now
+# succeeds in the build prefix and pulls in platform/gl -- whose freeglut we drop
+# below. We only ship the libraries, so keep the GL viewer off explicitly.
 TERMUX_PKG_EXTRA_MAKE_ARGS="
 prefix=$TERMUX_PREFIX
 pydir=$TERMUX_PYTHON_HOME/site-packages
@@ -23,6 +26,7 @@ libs
 c++
 shared=yes
 tesseract=yes
+HAVE_GLUT=no
 VENV_FLAG=
 V=1
 "
