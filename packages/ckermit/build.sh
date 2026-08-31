@@ -19,6 +19,13 @@ termux_extract_src_archive() {
 
 termux_step_pre_configure() {
 	CFLAGS+=" -fPIC -Wno-error=implicit-int"
+	# ckwart -- the host-side "wart" preprocessor -- is built by the makefile with
+	# $(CC_FOR_BUILD), which never sees the CFLAGS above. Its K&R definitions, e.g.
+	# "main(argc,argv) int argc; char **argv; {", now fail as "return type defaults
+	# to 'int' [-Wimplicit-int]". Note -std=gnu17 does NOT help: current gcc raises
+	# implicit-int to an error whatever the standard, so it has to be downgraded by
+	# name, exactly as CFLAGS above does for the target compiler.
+	export CC_FOR_BUILD="$CC_FOR_BUILD -Wno-error=implicit-int"
 	export KFLAGS="-DNOGETUSERSHELL -UNOTIMEH -DTIMEH -DUSE_FILE_R"
 	LDFLAGS+=" -lcrypt"
 	export LNKFLAGS="$LDFLAGS"
