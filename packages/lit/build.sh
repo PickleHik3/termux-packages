@@ -11,14 +11,29 @@ TERMUX_PKG_SUGGESTS="luvit"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_NO_STRIP=true
 
+# The prebuilt host luvi these steps run completes its work, prints "done: success",
+# and then aborts while tearing down (SIGABRT, exit 134). Judge the invocations by
+# the artifact they produce rather than by their exit status, and still refuse any
+# other failure. The unzip in termux_step_make_install is the integrity check.
+_lit_run() {
+	local artifact="$1"
+	shift
+	local rc=0
+	"$@" || rc=$?
+	[ -s "$artifact" ] ||
+		termux_error_exit "'$*' produced no $artifact (exit $rc)"
+	[ "$rc" = 0 ] || [ "$rc" = 134 ] ||
+		termux_error_exit "'$*' failed with exit $rc"
+}
+
 termux_step_configure() {
-	sh "${TERMUX_PKG_SRCDIR}/get-lit.sh"
+	_lit_run lit sh "${TERMUX_PKG_SRCDIR}/get-lit.sh"
 	mv lit "${TERMUX_PKG_SRCDIR}/_lit"
 }
 
 termux_step_make() {
 	touch dummy
-	./_lit make . ./lit dummy
+	_lit_run lit ./_lit make . ./lit dummy
 }
 
 termux_step_make_install() {
