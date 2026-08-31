@@ -82,6 +82,15 @@ termux_step_pre_configure() {
 	PYI_LOG_LEVEL=DEBUG \
 	PYI_STATIC_ZLIB=1 \
 	" termux_setup_proot
+	# NOTE: awscli still does not build. PYI_STATIC_ZLIB above does take effect -- waf
+	# stops probing for the system libz and compiles pyinstaller's bundled copy
+	# instead -- but that then dies on "zconf.h:456: fatal error: 'sys/types.h' file
+	# not found". The real defect is that waf's bootloader build gets no usable header
+	# search path under proot at all, which is also why its configure reports
+	# semaphore.h and sys/sem.h as missing; "Checking for library z : no" was a
+	# symptom of the same thing rather than a missing zlib. Fixing this means getting
+	# CPPFLAGS/--sysroot through to waf, which needs live iteration inside proot.
+	# The flag is kept only because it surfaces the accurate diagnostic.
 }
 
 termux_step_configure() {
