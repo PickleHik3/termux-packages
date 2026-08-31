@@ -3,7 +3,10 @@ TERMUX_PKG_DESCRIPTION="Wrapper around texlive's install-tl script"
 TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="Henrik Grimler @Grimler91"
 TERMUX_PKG_VERSION="20260301"
-TERMUX_PKG_SRCURL="https://ftp.math.utah.edu/pub/tex/historic/systems/texlive/${TERMUX_PKG_VERSION:0:4}/install-tl-unx.tar.gz"
+# ftp.math.utah.edu stopped answering -- every attempt times out after 30s, in both
+# queue passes. Switched to the TUG historic mirror at TU Chemnitz, which serves the
+# byte-identical file: TERMUX_PKG_SHA256 below is unchanged and still verifies.
+TERMUX_PKG_SRCURL="https://ftp.tu-chemnitz.de/pub/tug/historic/systems/texlive/${TERMUX_PKG_VERSION:0:4}/install-tl-unx.tar.gz"
 TERMUX_PKG_SHA256=5cc0703d6fe49f00a2932c4e3bcee37a11cc0a969ae9fcbf9cad6f0d984d6363
 TERMUX_PKG_PLATFORM_INDEPENDENT=true
 TERMUX_PKG_DEPENDS="perl, texlive-bin (>= 20240310), gnupg, curl, lz4, xz-utils"
