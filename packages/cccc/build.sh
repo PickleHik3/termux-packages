@@ -15,7 +15,12 @@ TERMUX_PKG_MAKE_PROCESSES=1
 termux_step_host_build() {
 	find $TERMUX_PKG_SRCDIR -mindepth 1 -maxdepth 1 -exec cp -a \{\} ./ \;
 
-	export CC="gcc -m${TERMUX_ARCH_BITS}"
+	# PCCTS declares its state-machine dispatch tables the K&R way, e.g.
+	# "extern void (*fpReach[])();", and calls them with arguments. Under C23 an empty
+	# parameter list means "no parameters", so gcc now rejects that as "too many
+	# arguments to function". Build the host antlr/dlg as gnu17, where () still means
+	# an unspecified list.
+	export CC="gcc -m${TERMUX_ARCH_BITS} -std=gnu17"
 	export CCC="g++ -m${TERMUX_ARCH_BITS}"
 
 	sh build_posixgcc.sh
