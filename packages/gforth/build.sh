@@ -28,7 +28,13 @@ termux_step_host_build() {
 	mkdir -p $_PREFIX_FOR_BUILD
 
 	find $TERMUX_PKG_SRCDIR -mindepth 1 -maxdepth 1 -exec cp -a \{\} ./ \;
-	./configure --prefix=$_PREFIX_FOR_BUILD CC="gcc -m$TERMUX_ARCH_BITS"
+	# engine/signals.c:432 selects between SIG_IGN, a void(*)(int), and throw_handler,
+	# a void(*)(void), in one conditional expression. Current gcc rejects that as
+	# "pointer type mismatch in conditional expression", the host gforth is never
+	# built, and the failure then surfaces much later as preforth reporting
+	# "You need to configure with a gforth in $PATH to build this part".
+	./configure --prefix=$_PREFIX_FOR_BUILD \
+		CC="gcc -m$TERMUX_ARCH_BITS -Wno-error=incompatible-pointer-types"
 	make -j $TERMUX_PKG_MAKE_PROCESSES
 	make install
 }
