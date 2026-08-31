@@ -1,0 +1,45 @@
+Termux points --android-ndk at the standalone clang toolchain (see
+swift-standalone-toolchain.patch, which already remaps the sysroot and tools
+paths for that layout) rather than at a full NDK release. swift 6.2 added a hard
+NDK-version check that reads $NDK/source.properties, which the standalone
+toolchain does not ship, so configuring the Android stdlib aborted with
+"Could not detect NDK version".
+
+The version only decides whether the clang resource directory lives under lib/
+(NDK >= r26) or lib64/, so recognise the standalone toolchain by its
+AndroidVersion.txt and take the modern layout. A genuinely wrong --android-ndk
+path still gets the original fatal error.
+
+--- a/swift/stdlib/cmake/modules/AddSwiftStdlib.cmake
++++ b/swift/stdlib/cmake/modules/AddSwiftStdlib.cmake
+@@ -562,16 +562,23 @@
+         if(NOT NDK_VERSION MATCHES "Pkg\\.Revision = ([0-9\\.]+)")
+           message(FATAL_ERROR "Could not find NDK version in source.properties: ${NDK_VERSION}")
+         endif()
+-
+-        if("${CMAKE_MATCH_1}" VERSION_GREATER_EQUAL "26")
+-          file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
+-        else()
+-          file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
+-        endif()
+-        list(APPEND result "-resource-dir=${RESOURCE_DIR}")
++        set(SWIFT_ANDROID_NDK_MAJOR "${CMAKE_MATCH_1}")
++      elseif(EXISTS "${SWIFT_ANDROID_NDK_PATH}/AndroidVersion.txt")
++        # Termux passes --android-ndk the standalone clang toolchain rather than a
++        # full NDK release, so there is no source.properties to read. It always
++        # uses the post-r26 layout, with the clang resource directory under lib/
++        # instead of lib64/, which is the only thing the version decides here.
++        set(SWIFT_ANDROID_NDK_MAJOR "26")
+       else()
+         message(FATAL_ERROR "Could not detect NDK version: ${SWIFT_ANDROID_NDK_PATH}/source.properties not found")
+       endif()
++
++      if("${SWIFT_ANDROID_NDK_MAJOR}" VERSION_GREATER_EQUAL "26")
++        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
++      else()
++        file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
++      endif()
++      list(APPEND result "-resource-dir=${RESOURCE_DIR}")
+     endif()
+ 
+     # link against the custom C++ library
