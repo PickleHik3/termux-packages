@@ -28,8 +28,11 @@ termux_step_host_build() {
 	pushd ecl
 	local ecl_srcdir=$TERMUX_PKG_SRCDIR/ecl/src
 	autoreconf -fi $ecl_srcdir/gmp
+	# maxima vendors its own ECL rather than using the ecl package, so it needs the
+	# same workaround: src/c/dpp.c does `typedef int bool`, which the host gcc rejects
+	# now that it defaults to C23.
 	$ecl_srcdir/configure ABI=${TERMUX_ARCH_BITS} \
-		CFLAGS=-m${TERMUX_ARCH_BITS} LDFLAGS=-m${TERMUX_ARCH_BITS} \
+		CFLAGS="-m${TERMUX_ARCH_BITS} -std=gnu17" LDFLAGS=-m${TERMUX_ARCH_BITS} \
 		--prefix=$_PREFIX_FOR_BUILD --srcdir=$ecl_srcdir --disable-c99complex
 	make -j $TERMUX_PKG_MAKE_PROCESSES
 	make install
