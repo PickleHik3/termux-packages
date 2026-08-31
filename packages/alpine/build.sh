@@ -38,6 +38,18 @@ termux_step_pre_configure() {
 
 	touch $TERMUX_PKG_SRCDIR/imap/lnxok
 
+	# configure.ac asks for gettext 0.16.1 (2006). aclocal runs in --install mode here
+	# whatever we do -- Makefile.am sets ACLOCAL_AMFLAGS = --install -I m4, and
+	# autoreconf -i implies it too -- and against a modern gettext that oscillates:
+	# every system macro it copies into m4/ pulls in another, until automake 1.18
+	# aborts with "too many loops". Ask for a version autopoint actually ships and let
+	# it lay down one consistent macro set before autoreconf runs.
+	local _gt='AM_GNU_GETTEXT_VERSION([0.16.1])'
+	grep -qF "$_gt" configure.ac ||
+		termux_error_exit "alpine: '$_gt' not found in configure.ac; the gettext bump needs revisiting."
+	sed -i 's/AM_GNU_GETTEXT_VERSION(\[0\.16\.1\])/AM_GNU_GETTEXT_VERSION([0.21])/' configure.ac
+	autopoint --force
+
 	autoreconf -fi
 }
 
