@@ -13,12 +13,19 @@ TERMUX_PKG_AUTO_UPDATE=true
 # them: this package ships bin/showkey alone and everything that reads compressed
 # keymaps is deleted below, so turn them off and stop the build depending on what
 # else is installed.
+#
+# --without-bzip2 alone is not enough: configure.ac sets HAVE_BZIP2=no for it and
+# then the very next block, "AS_IF([test \$HAVE_BZIP2 = no], [AC_CHECK_LIB(bz2,
+# BZ2_bzDecompressInit, ...)])", has no with_bzip2 guard and flips it back to yes
+# because libbz2 is installed. Override that probe's cache entry so the fallback
+# fails too. zlib, lzma and zstd honour their --without- flags correctly.
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 --disable-vlock
 --without-zlib
 --without-bzip2
 --without-lzma
 --without-zstd
+ac_cv_lib_bz2_BZ2_bzDecompressInit=no
 "
 
 # We're only keeping:
