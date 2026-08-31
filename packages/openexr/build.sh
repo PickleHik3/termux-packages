@@ -10,6 +10,11 @@ TERMUX_PKG_SHA256=7c663c3c41da9354b5af277bc2fd1d2360788050b4e0751a32bcd50e8abaef
 # does find_dependency(libdeflate) -- without it every CONFIG-mode consumer of
 # OpenEXR silently fails to find the package (libvigra).
 TERMUX_PKG_DEPENDS="imath, libc++, libdeflate, zlib"
+# libdeflate's CMake config declares libdeflate::libdeflate_static unconditionally,
+# but the static split moves libdeflate.a into libdeflate-static, so
+# find_package(libdeflate) aborts on an imported target whose file is missing. We
+# link the shared library; the archive only has to exist while CMake validates.
+TERMUX_PKG_BUILD_DEPENDS="libdeflate-static"
 TERMUX_PKG_CONFLICTS="openexr2"
 TERMUX_PKG_REPLACES="openexr2"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
