@@ -34,7 +34,13 @@ termux_step_host_build() {
 	popd
 
 	# Building bloxtk on archlinux fails with this error: https://bugs.gentoo.org/582936
-	"$TERMUX_PKG_SRCDIR"/configure --disable-gtk --disable-bloxtk
+	# The C23 incompatibility documented in termux_step_pre_configure applies just as
+	# much here, but this configure ran with no CFLAGS at all and so picked up the host
+	# gcc's C23 default. lib-src/regex.c declares its helpers through a _(args) macro
+	# that collapses to () when HAVE_PROTOTYPES is unset -- which smalltalk's configure
+	# never sets -- and under C23 an empty parameter list means "no parameters", so the
+	# calls fail with "too many arguments to function 'init_regs'; expected 0, have 2".
+	"$TERMUX_PKG_SRCDIR"/configure --disable-gtk --disable-bloxtk CFLAGS="-std=gnu99"
 	make
 }
 
