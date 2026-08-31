@@ -35,7 +35,9 @@ termux_step_configure() {
 
 	echo "CC_FOR_BUILD = cc" >> config.mk
 	echo "LD_FOR_BUILD = cc" >> config.mk
-	echo "CFLAGS_FOR_BUILD = " >> config.mk
+	# The buildtools do `typedef int bool`, which the host gcc rejects now that it
+	# defaults to C23 and bool is a keyword.
+	echo "CFLAGS_FOR_BUILD = -std=gnu17" >> config.mk
 	echo "LDFLAGS_FOR_BUILD = " >> config.mk
 	echo "JPEGLIB = ${TERMUX_PREFIX}/lib/libjpeg.so" >> config.mk
 	echo "TIFFLIB = ${TERMUX_PREFIX}/lib/libtiff.so" >> config.mk

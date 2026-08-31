@@ -19,6 +19,11 @@ termux_step_pre_configure() {
 
 	LDFLAGS+=" -liconv"
 
+	# json-c <= 0.19 emits linkhash.h's accessors as plain statics under C++, which
+	# trips newsboat's -Werror. Fixed in json-c by linkhash.h.patch, but keep this so
+	# the build does not depend on which json-c is installed in the prefix.
+	CXXFLAGS+=" -Wno-error=unused-function"
+
 	export CXX_FOR_BUILD=g++
 	export CXXFLAGS_FOR_BUILD="-O2"
 

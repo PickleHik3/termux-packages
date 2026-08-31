@@ -1,0 +1,17 @@
+Backport of the upstream json-c change that also uses `inline` when linkhash.h
+is included from C++. __STDC_VERSION__ is not defined in C++, so the accessors
+were emitted as plain `static` functions, and every C++ translation unit that
+included the header without calling them warned under -Wunused-function --
+fatal for consumers building with -Werror, such as newsboat.
+
+--- a/linkhash.h
++++ b/linkhash.h
+@@ -345,7 +345,7 @@
+ /**
+  * @deprecated Don't use this outside of linkhash.h:
+  */
+-#if !defined (__STDC_VERSION__) || (__STDC_VERSION__ < 199901L)
++#if !defined(__cplusplus) && (!defined (__STDC_VERSION__) || (__STDC_VERSION__ < 199901L))
+ /* C89 compilers like VS2010 can't handle inline funcs, so skip it there,
+    note: this also applies to -std=c89 in GCC! */
+ #define _LH_INLINE
