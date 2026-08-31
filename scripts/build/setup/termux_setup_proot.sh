@@ -9,32 +9,42 @@ termux_setup_proot() {
 
 	export PATH="$TERMUX_PROOT_BIN:$PATH"
 
-	[[ -d "$TERMUX_PROOT_BIN" ]] && return
+	if [[ ! -d "$TERMUX_PROOT_BIN" ]]; then
+		if ! [[ -d "$TERMUX_PREFIX/opt/aosp" ]]; then
+			echo "ERROR: Add 'aosp-libs' to TERMUX_PKG_BUILD_DEPENDS. 'proot' cannot run without it."
+			exit 1
+		fi
 
-	if ! [[ -d "$TERMUX_PREFIX/opt/aosp" ]]; then
-		echo "ERROR: Add 'aosp-libs' to TERMUX_PKG_BUILD_DEPENDS. 'proot' cannot run without it."
-		exit 1
+		mkdir -p "$TERMUX_PROOT_BIN"
+
+		termux_download https://github.com/proot-me/proot/releases/download/v"$TERMUX_PROOT_VERSION"/proot-v"$TERMUX_PROOT_VERSION"-x86_64-static \
+			"$TERMUX_PROOT_BIN/proot" \
+			d1eb20cb201e6df08d707023efb000623ff7c10d6574839d7bb42d0adba6b4da
+		chmod +x "$TERMUX_PROOT_BIN"/proot
+
+		declare -A checksums=(
+			["aarch64"]="dce64b2dc6b005485c7aa735a7ea39cb0006bf7e5badc28b324b2cd0c73d883f"
+			["arm"]="9f07762a3cd0f8a199cb5471a92402a4765f8e2fcb7fe91a87ee75da9616a806"
+		)
+		if [[ "$TERMUX_ARCH" == "aarch64" ]] || [[ "$TERMUX_ARCH" == "arm" ]]; then
+			termux_download https://github.com/multiarch/qemu-user-static/releases/download/v"$TERMUX_QEMU_VERSION"/qemu-"${TERMUX_ARCH/i686/i386}"-static \
+				"$TERMUX_PROOT_BIN"/qemu-"$TERMUX_ARCH" \
+				"${checksums[$TERMUX_ARCH]}"
+			chmod +x "$TERMUX_PROOT_BIN"/qemu-"$TERMUX_ARCH"
+		fi
 	fi
 
-	mkdir -p "$TERMUX_PROOT_BIN"
-
-	termux_download https://github.com/proot-me/proot/releases/download/v"$TERMUX_PROOT_VERSION"/proot-v"$TERMUX_PROOT_VERSION"-x86_64-static \
-		"$TERMUX_PROOT_BIN/proot" \
-		d1eb20cb201e6df08d707023efb000623ff7c10d6574839d7bb42d0adba6b4da
-	chmod +x "$TERMUX_PROOT_BIN"/proot
-
-	declare -A checksums=(
-		["aarch64"]="dce64b2dc6b005485c7aa735a7ea39cb0006bf7e5badc28b324b2cd0c73d883f"
-		["arm"]="9f07762a3cd0f8a199cb5471a92402a4765f8e2fcb7fe91a87ee75da9616a806"
-	)
 	if [[ "$TERMUX_ARCH" == "aarch64" ]] || [[ "$TERMUX_ARCH" == "arm" ]]; then
-		termux_download https://github.com/multiarch/qemu-user-static/releases/download/v"$TERMUX_QEMU_VERSION"/qemu-"${TERMUX_ARCH/i686/i386}"-static \
-			"$TERMUX_PROOT_BIN"/qemu-"$TERMUX_ARCH" \
-			"${checksums[$TERMUX_ARCH]}"
-		chmod +x "$TERMUX_PROOT_BIN"/qemu-"$TERMUX_ARCH"
 		TERMUX_PROOT_QEMU="-q $TERMUX_PROOT_BIN/qemu-$TERMUX_ARCH"
 	fi
 
+	# The wrapper bakes in the calling package's environment -- PATH, TERM and
+	# whatever it put in TERMUX_PROOT_EXTRA_ENV_VARS -- so it must be rewritten for
+	# every package. It used to be generated only alongside the downloads above,
+	# which meant every proot user inherited the environment of whichever package
+	# created the cache first. In a full queue that is awscli, which sets an empty
+	# LD_LIBRARY_PATH, so ghc-iserv could not find libandroid-posix-semaphore.so
+	# and pandoc, hledger and hledger-ui all failed. Only the downloads are cached.
 	# NOTE: We include current PATH too so that host binaries also become available under proot.
 	cat <<-EOF >"$TERMUX_PROOT_BIN/$TERMUX_PROOT_BIN_NAME"
 		#!/bin/bash

@@ -8,8 +8,8 @@ termux_setup_ghc_iserv() {
 
 	export PATH="$TERMUX_ISERV_BIN:$PATH"
 
-	[[ -d "$TERMUX_ISERV_BIN" ]] && return
-
+	# Regenerate unconditionally: these wrappers embed the ghc bin directory of the
+	# package that ran first, which is not necessarily the one this package uses.
 	mkdir -p "$TERMUX_ISERV_BIN"
 
 	local ghc_bin_dir
