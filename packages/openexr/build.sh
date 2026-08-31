@@ -3,10 +3,13 @@ TERMUX_PKG_DESCRIPTION="Provides the specification and reference implementation 
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="3.4.4"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL="https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz"
 TERMUX_PKG_SHA256=7c663c3c41da9354b5af277bc2fd1d2360788050b4e0751a32bcd50e8abaef8f
-TERMUX_PKG_DEPENDS="imath, libc++, zlib"
+# libOpenEXRCore has NEEDED libdeflate.so, and the installed OpenEXRConfig.cmake
+# does find_dependency(libdeflate) -- without it every CONFIG-mode consumer of
+# OpenEXR silently fails to find the package (libvigra).
+TERMUX_PKG_DEPENDS="imath, libc++, libdeflate, zlib"
 TERMUX_PKG_CONFLICTS="openexr2"
 TERMUX_PKG_REPLACES="openexr2"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
