@@ -8,9 +8,15 @@ TERMUX_PKG_SRCURL="https://www.monetdb.org/downloads/sources/archive/MonetDB-${T
 TERMUX_PKG_SHA256=480c921a45b54c610dee9a17147f0e89ae74c31516b9250e5c8f2371e1bd70c2
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="libandroid-sysv-semaphore, libbz2, libcurl, libiconv, liblz4, liblzma, libxml2, netcdf-c, pcre2, readline, zlib"
+# FITS defaults to ON and pulls in cfitsio whenever it is sitting in the shared build
+# prefix -- it is not in DEPENDS, so whether the module gets built depends on queue
+# ordering. It also fails the undefined-symbol check, because lib_fits.so references
+# glob(), which bionic does not have. Turn it off rather than declare cfitsio and link
+# libandroid-glob for a module the package never advertised.
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
 -DODBC=OFF
 -DTESTING=OFF
+-DFITS=OFF
 "
 
 # ```
