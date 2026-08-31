@@ -80,6 +80,7 @@ termux_step_pre_configure() {
 	LDFLAGS='$LDFLAGS' \
 	PYTHON='$TERMUX_PREFIX/bin/python3' \
 	PYI_LOG_LEVEL=DEBUG \
+	PYI_STATIC_ZLIB=1 \
 	" termux_setup_proot
 }
 
