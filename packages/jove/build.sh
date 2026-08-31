@@ -9,14 +9,20 @@ TERMUX_PKG_SRCURL=https://github.com/jonmacs/jove/archive/refs/tags/${TERMUX_PKG
 TERMUX_PKG_SHA256=ca5a5fcf71009c7389d655d1f1ae8139710f6cc531be95581e4b375e67f098d2
 TERMUX_PKG_DEPENDS="ncurses"
 TERMUX_PKG_BUILD_IN_SRC=true
-# setmaps is built with the host compiler (LOCALCC), and jove.h does
-# `typedef int bool`, which the host gcc rejects now that it defaults to C23.
 TERMUX_PKG_EXTRA_MAKE_ARGS="
 JOVEHOME=$TERMUX_PREFIX
 SYSDEFS=-DLinux
 LDLIBS=-lncursesw
-LOCALCFLAGS=-std=gnu17
 "
+
+termux_step_pre_configure() {
+	# setmaps is built with the host compiler, and jove.h does `typedef int bool`,
+	# which the host gcc rejects now that it defaults to C23. The flag has to ride on
+	# CC_FOR_BUILD (which the Makefile uses as LOCALCC) rather than LOCALCFLAGS: the
+	# link rule writes "$(LOCALCFLAGS)-o" with no separating space, so a non-empty
+	# LOCALCFLAGS becomes "-std=gnu17-o".
+	export CC_FOR_BUILD="$CC_FOR_BUILD -std=gnu17"
+}
 
 termux_step_post_massage() {
 	mkdir -p ./var/lib/jove/preserve
