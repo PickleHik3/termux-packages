@@ -6,7 +6,20 @@ TERMUX_PKG_VERSION="2.10.0"
 TERMUX_PKG_SRCURL=https://mirrors.edge.kernel.org/pub/linux/utils/kbd/kbd-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=4ed59299759457aa6424b4a4ce116625ec27660f6492e4be264d326053fe4261
 TERMUX_PKG_AUTO_UPDATE=true
-TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--disable-vlock"
+# The compression backends all default to "auto", so they switch on whenever zlib,
+# bzip2, liblzma or zstd happen to be in the shared build prefix. That drags in
+# libkbdfile's kbdfile-{zlib,bzip2,lzma,zstd}.c, which call memfd_create -- declared
+# only under __USE_GNU and only from API 30, while we target 24. Nothing here needs
+# them: this package ships bin/showkey alone and everything that reads compressed
+# keymaps is deleted below, so turn them off and stop the build depending on what
+# else is installed.
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
+--disable-vlock
+--without-zlib
+--without-bzip2
+--without-lzma
+--without-zstd
+"
 
 # We're only keeping:
 # bin/showkey
