@@ -1,0 +1,43 @@
+autogen.sh gates on hardcoded tool versions that have since rotted: it accepts
+libtool 1.4/1.5/2.2/2.4 but the builder now has 2.5.4, and it looks only for
+automake-1.9 .. automake-1.16 while the builder has 1.18.1 and ships no
+versioned symlink. Both checks fail, so autogen.sh exits before generating
+configure -- taking notmuch, mu, muchsync and neomutt down with it.
+
+Accept any libtool 2.x, extend the automake list, and fall back to the
+unsuffixed binaries so this does not rot again.
+
+--- a/autogen.sh
++++ b/autogen.sh
+@@ -28,7 +28,7 @@
+ if ${LIBTOOLIZE} --version < /dev/null > /dev/null 2>&1 ; then
+ 	libtool_version=`${LIBTOOLIZE} --version | sed '/^$/d;s/([^)]*)//g;s/^[^0-9]*//;s/[- ].*//g;q'`
+ 	case $libtool_version in
+-	    1.4*|1.5*|2.2*|2.4*)
++	    1.4*|1.5*|2.*)
+ 		have_libtool=true
+ 		;;
+ 	esac
+@@ -57,7 +57,7 @@
+ 	DIE=1
+ }
+ 
+-for automake_version in 1.9 1.10 1.11 1.12 1.13 1.14 1.15 1.16; do
++for automake_version in 1.9 1.10 1.11 1.12 1.13 1.14 1.15 1.16 1.17 1.18; do
+     if automake-${automake_version} --version < /dev/null > /dev/null 2>&1 ; then
+         AUTOMAKE=automake-${automake_version}
+         ACLOCAL=aclocal-${automake_version}
+@@ -65,6 +65,13 @@
+     fi
+ done
+ 
++# Distributions increasingly ship only unsuffixed binaries, so fall back to those
++# rather than adding a new number to the list above every release.
++if test -z "${AUTOMAKE}" && automake --version < /dev/null > /dev/null 2>&1 ; then
++    AUTOMAKE=automake
++    ACLOCAL=aclocal
++fi
++
+ if test -z "${AUTOMAKE}"; then
+ 	echo
+ 	echo "You must have automake >= 1.9.x installed to compile ${PROJECT}."
