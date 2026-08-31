@@ -8,7 +8,12 @@ TERMUX_PKG_SHA256=d56caeb6c86f751cb454d8fef45f3daecc508f208290d9f51e8c75bba5dc46
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="attr, libbz2, libc++, libgcrypt, libgpg-error, liblzma, liblzo, zlib, zstd"
 TERMUX_PKG_BUILD_IN_SRC=
-TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--disable-dar-static"
+# librhash is not in DEPENDS, but configure picks it up whenever some other package
+# has left it in the shared build prefix -- and then its usability probe, an
+# AC_RUN_IFELSE, fails with "cannot run test program while cross compiling". Linking
+# it would also give dar an undeclared NEEDED. Keep the build independent of what
+# else happens to be installed; the cost is whirlpool hash support.
+TERMUX_PKG_EXTRA_CONFIGURE_ARGS="--disable-dar-static --disable-librhash-linking"
 
 termux_step_pre_configure() {
 	if [ "$TERMUX_ARCH_BITS" = "32" ]; then
