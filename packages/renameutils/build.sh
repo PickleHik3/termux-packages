@@ -4,7 +4,10 @@ TERMUX_PKG_LICENSE="GPL-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION=0.12.0
 TERMUX_PKG_REVISION=3
-TERMUX_PKG_SRCURL=https://savannah.nongnu.org/download/renameutils/renameutils-$TERMUX_PKG_VERSION.tar.gz
+# Same stale savannah URL form as quilt: the /download/ path returns the releases
+# index as HTML rather than the tarball. The checksum below is unchanged and still
+# verifies against the file the download host serves.
+TERMUX_PKG_SRCURL=https://download.savannah.nongnu.org/releases/renameutils/renameutils-$TERMUX_PKG_VERSION.tar.gz
 TERMUX_PKG_SHA256=cbd2f002027ccf5a923135c3f529c6d17fabbca7d85506a394ca37694a9eb4a3
 TERMUX_PKG_DEPENDS="libandroid-wordexp, readline"
 
