@@ -40,7 +40,11 @@ termux_step_host_build() {
 	# that collapses to () when HAVE_PROTOTYPES is unset -- which smalltalk's configure
 	# never sets -- and under C23 an empty parameter list means "no parameters", so the
 	# calls fail with "too many arguments to function 'init_regs'; expected 0, have 2".
-	"$TERMUX_PKG_SRCDIR"/configure --disable-gtk --disable-bloxtk CFLAGS="-std=gnu99"
+	# packages/iconv/iconv.c:85 hands iconv() a "const char **" where it wants
+	# "char **", which current gcc reports as an error rather than a warning, so add
+	# -Wno-error=incompatible-pointer-types alongside the standard downgrade.
+	"$TERMUX_PKG_SRCDIR"/configure --disable-gtk --disable-bloxtk \
+		CFLAGS="-std=gnu99 -Wno-error=incompatible-pointer-types"
 	make
 }
 
