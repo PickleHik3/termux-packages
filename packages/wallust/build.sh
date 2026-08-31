@@ -4,7 +4,10 @@ TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="3.5.2"
 TERMUX_PKG_SRCURL="https://codeberg.org/explosion-mental/wallust/archive/${TERMUX_PKG_VERSION}.tar.gz"
-TERMUX_PKG_SHA256=46c2592217f0de968437850b14b2e844f2af4158b70135b2b448dc426c0309a1
+# Codeberg generates archive tarballs on demand and they are not byte-stable.
+# Verified before re-pinning: all 191 entries are identical to tag 3.5.2, commit
+# b689616d630bb2e541695f101d313699464aac09.
+TERMUX_PKG_SHA256=8609d27162975777797f2f625d884a6475c766ed943393219d585577ac8bfcfe
 TERMUX_PKG_RECOMMENDS="imagemagick"
 TERMUX_PKG_BUILD_IN_SRC=true
 TERMUX_PKG_AUTO_UPDATE=true
