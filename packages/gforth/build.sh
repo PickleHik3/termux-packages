@@ -28,13 +28,16 @@ termux_step_host_build() {
 	mkdir -p $_PREFIX_FOR_BUILD
 
 	find $TERMUX_PKG_SRCDIR -mindepth 1 -maxdepth 1 -exec cp -a \{\} ./ \;
-	# engine/signals.c:432 selects between SIG_IGN, a void(*)(int), and throw_handler,
-	# a void(*)(void), in one conditional expression. Current gcc rejects that as
-	# "pointer type mismatch in conditional expression", the host gforth is never
-	# built, and the failure then surfaces much later as preforth reporting
+	# The host engine is pre-C23 C in two ways that current gcc now rejects outright:
+	# engine/signals.c:432 puts SIG_IGN, a void(*)(int), and throw_handler, a
+	# void(*)(void), in one conditional expression ("pointer type mismatch"), and
+	# engine/support.c:108 calls getpwnam through a declaration with an empty
+	# parameter list, which C23 reads as "no parameters" ("too many arguments to
+	# function 'getpwnam'; expected 0, have 1"). Either one stops the host gforth being
+	# built, and the failure then surfaces far away as preforth reporting
 	# "You need to configure with a gforth in $PATH to build this part".
 	./configure --prefix=$_PREFIX_FOR_BUILD \
-		CC="gcc -m$TERMUX_ARCH_BITS -Wno-error=incompatible-pointer-types"
+		CC="gcc -m$TERMUX_ARCH_BITS -std=gnu17"
 	make -j $TERMUX_PKG_MAKE_PROCESSES
 	make install
 }
