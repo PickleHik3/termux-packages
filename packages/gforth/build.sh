@@ -50,6 +50,16 @@ termux_step_pre_configure() {
 termux_step_post_configure() {
 	sed -i -e 's:\.\(/gforth-ditc\):'$TERMUX_PKG_HOSTBUILD_DIR'\1:g' \
 		Makefile
+
+	# gforth.elc is byte-compiled by emacs, and that rule (Makefile:909) is prefixed
+	# with '-' so a missing emacs is ignored and the file simply never appears. The
+	# install target is not so forgiving: it installs gforth.elc whenever
+	# $TERMUX_PREFIX/share/emacs/site-lisp exists -- which it does -- and dies with
+	# "install: cannot stat 'gforth.elc'". Byte-compiling is not an option in a cross
+	# build either, since Termux's emacs is an aarch64 binary that cannot run on the
+	# builder. Drop just that one install line; gforth.el itself still ships, and the
+	# surrounding if/else stays valid because the preceding line also ends in "; \".
+	sed -i '/INSTALL_DATA) gforth\.elc/d' Makefile
 }
 
 termux_step_post_massage() {
