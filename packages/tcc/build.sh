@@ -70,18 +70,20 @@ termux_step_make() {
 				otherinc+="${p}"
 			fi
 		done
-		# Deliberately drop $otherinc, which is clang's own builtin header directory
-		# (.../lib/clang/<ver>/include). Those headers are clang-specific: stddef.h
-		# pulls in __stddef_ptrdiff_t.h, which tests __has_feature(modules) and
-		# __building_module(), neither of which tcc implements -- it reports
-		# "function-like macro '__building_module' is not defined" rather than
-		# short-circuiting. Baking that directory into tcc.host is what made
-		# libtcc1.a fail: bionic's sys/types.h asks for <stddef.h> and gets clang's.
-		# tcc ships its own float.h, stdarg.h, stdbool.h, stddef.h, stdatomic.h,
-		# stdalign.h and stdnoreturn.h and finds them via -B, so it does not need
-		# clang's. The target configure below already leaves this directory out and
-		# lists lib/tcc/include instead; this makes the host build agree.
-		sysinc="${sysinc%:}"
+		# tcc's own compiler headers must come first. clang's builtin directory
+		# (in $otherinc) carries a stddef.h that pulls in __stddef_ptrdiff_t.h, which
+		# tests __has_feature(modules) and __building_module() -- neither implemented
+		# by tcc, which errors on the function-like invocation instead of
+		# short-circuiting. Left to itself tcc resolves bionic's
+		# "sys/types.h -> #include <stddef.h>" to clang's copy and libtcc1.a dies.
+		#
+		# Prepending rather than dropping: an explicit --sysincludepaths replaces
+		# tcc's built-in default instead of adding to it, so -B alone does not put
+		# tcc's own include directory on the search path -- removing clang's
+		# directory outright just turns the error into "include file 'stddef.h' not
+		# found". Keep it available, but let tcc's float.h, stdarg.h, stdbool.h,
+		# stddef.h, stdatomic.h, stdalign.h and stdnoreturn.h shadow it.
+		sysinc="${TERMUX_PKG_SRCDIR}/include:${sysinc}${otherinc%:}"
 		unset CC CFLAGS LDFLAGS
 		./configure \
 			--prefix="/tmp/tcc.host" \
