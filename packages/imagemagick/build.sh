@@ -3,12 +3,16 @@ TERMUX_PKG_DESCRIPTION="Suite to create, edit, compose, or convert images in a v
 TERMUX_PKG_LICENSE="ImageMagick"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="7.1.2.30"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL="https://github.com/ImageMagick/ImageMagick/archive/refs/tags/${TERMUX_PKG_VERSION%.*}-${TERMUX_PKG_VERSION##*.}.tar.gz"
 TERMUX_PKG_SHA256=3034a64f22398e15ee3dd1e6b1aa83d838cfc47df1bb246ae0eca9590e6ace72
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_UPDATE_VERSION_SED_REGEXP="s/-/./g"
-TERMUX_PKG_DEPENDS="djvulibre, fftw, fontconfig, freetype, gdk-pixbuf, ghostscript, glib, graphviz, harfbuzz, imath, jbig2dec, libandroid-support, libbz2, libc++, libcairo, libheif, libjpeg-turbo, libjxl, liblqr, libltdl, liblzma, libpng, libraqm, libraw, librsvg, libtiff, libwebp, libx11, libxext, libxml2, libzip, littlecms, openexr, openjpeg, pango, zlib"
+# libMagickCore has NEEDED entries for libXt.so, libSM.so, libICE.so and libuuid.so,
+# none of which the previous dependency list reached, so "pkg install imagemagick"
+# produced a magick that would not start. libxt covers all four: it pulls libice,
+# libsm and libx11, and libsm in turn pulls libuuid.
+TERMUX_PKG_DEPENDS="djvulibre, fftw, fontconfig, freetype, gdk-pixbuf, ghostscript, glib, graphviz, harfbuzz, imath, jbig2dec, libandroid-support, libbz2, libc++, libcairo, libheif, libjpeg-turbo, libjxl, liblqr, libltdl, liblzma, libpng, libraqm, libraw, librsvg, libtiff, libwebp, libx11, libxext, libxml2, libxt, libzip, littlecms, openexr, openjpeg, pango, zlib"
 TERMUX_PKG_BREAKS="imagemagick-dev, imagemagick-x"
 TERMUX_PKG_REPLACES="imagemagick-dev, imagemagick-x"
 TERMUX_PKG_EXTRA_CONFIGURE_ARGS="
