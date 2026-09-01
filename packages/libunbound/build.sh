@@ -3,6 +3,12 @@ TERMUX_PKG_DESCRIPTION="A validating, recursive, caching DNS resolver"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="1.26.0"
+# The published pyunbound_1.26.0 deb is empty -- 784 bytes, six directory entries and
+# no files at all -- so dpkg reports "pyunbound disappeared, all files overwritten by
+# other packages" on install. Its subpackage takes lib/python*, and nothing matched,
+# which means --with-pyunbound produced no bindings in the cross build. That deb
+# predates any log we still have, so bump the revision to force a rebuild and get one.
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://nlnetlabs.nl/downloads/unbound/unbound-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=77458a7156e275c0b7b17fabcb357cb12445d95cfcb26fb9bb7d5ecba45e0b63
 TERMUX_PKG_AUTO_UPDATE=true
