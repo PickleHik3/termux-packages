@@ -23,6 +23,17 @@ termux_step_pre_configure() {
 }
 
 termux_step_post_make_install() {
-	install -Dm600 "$TERMUX_PKG_BUILDDIR/bindings/python/libtorrent.so" \
-		-t "$TERMUX_PYTHON_HOME/site-packages"
+	# CMake names the boost-python module after Python3_SOABI, which resolves via the
+	# -DPython3_EXECUTABLE build-python above and so now comes out as
+	# "libtorrent.cpython-314-x86_64-linux-gnu.so" rather than a bare "libtorrent.so".
+	# The tag describes the *host* interpreter that named it, not the object -- the
+	# module itself is linked by the NDK toolchain for the target -- so glob for
+	# whatever the link step produced and install it under the plain name Python will
+	# still import.
+	local _module
+	_module="$(find "$TERMUX_PKG_BUILDDIR/bindings/python" -maxdepth 1 \
+		-name 'libtorrent*.so' -print -quit)"
+	[ -n "$_module" ] ||
+		termux_error_exit "no libtorrent*.so in $TERMUX_PKG_BUILDDIR/bindings/python"
+	install -Dm600 "$_module" "$TERMUX_PYTHON_HOME/site-packages/libtorrent.so"
 }
