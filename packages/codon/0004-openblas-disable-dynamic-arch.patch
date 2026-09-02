@@ -1,6 +1,23 @@
+Drop DYNAMIC_ARCH, build LAPACK in C, and keep OpenBLAS's CBLAS test directory
+configurable without a Fortran compiler.
+
+Removing enable_language(Fortran) leaves CMAKE_Fortran_COMPILER_ID empty, and
+OpenBLAS 0.3.29's ctest/CMakeLists.txt:47 dereferences it unquoted:
+
+    if (USE_OPENMP AND (${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU) AND ...)
+
+which CMake then sees as the malformed "( STREQUAL GNU )" and rejects with
+"Unknown arguments specified", failing configure before anything is compiled.
+That directory is added under "if(NOT NO_CBLAS)"/"if(NOT ONLY_CBLAS)", not under
+BUILD_TESTING, so the BUILD_TESTING OFF below cannot avoid it, and disabling
+CBLAS outright is not an option -- codon needs it. Give the variable a non-empty
+value instead so the expression parses and evaluates false: all it guards is
+stripping -fopenmp from Fortran flags for a GNU-Fortran + Clang-C combination
+that cannot arise here anyway.
+
 --- a/cmake/deps.cmake
 +++ b/cmake/deps.cmake
-@@ -156,13 +156,13 @@
+@@ -156,13 +156,14 @@
      EXCLUDE_FROM_ALL YES)
  
  if(NOT APPLE)
@@ -13,6 +30,7 @@
 -        OPTIONS "DYNAMIC_ARCH ON"
 +        OPTIONS "C_LAPACK ON"
 +                "$ENV{OPENBLAS_CROSS_TARGET}"
++                "CMAKE_Fortran_COMPILER_ID NONE"
                  "BUILD_TESTING OFF"
                  "BUILD_BENCHMARKS OFF"
                  "NUM_THREADS 64"
