@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="An opensource project for conversions between Traditiona
 TERMUX_PKG_LICENSE="Apache-2.0"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="1.4.2"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/BYVoid/OpenCC/archive/refs/tags/ver.${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=8e5f5cf7fe195bd9b9be851adc9738c1ef7dc5c24441dd5878a56db4087a9a70
 TERMUX_PKG_AUTO_UPDATE=true

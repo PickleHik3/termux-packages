@@ -3,6 +3,7 @@ TERMUX_PKG_DESCRIPTION="A toolchain for web projects, aimed to provide functiona
 TERMUX_PKG_LICENSE="Apache-2.0, MIT"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="2.5.10"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL=https://github.com/biomejs/biome/archive/refs/tags/@biomejs/biome@${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=7bb74776e3db235f7c15f2138758798f28db838eb1dfaa46cf8eaa2743538c29
 TERMUX_PKG_AUTO_UPDATE=true

@@ -7,7 +7,7 @@ TERMUX_PKG_VERSION="1.28.6"
 # .pc declares Requires.private: orc-0.4, but liborc was never in DEPENDS -- so the
 # published package was uninstallable-in-effect and every gst plugin failed to
 # configure. Upstream's build does not detect orc, hence no dep there.
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-${TERMUX_PKG_VERSION}.tar.xz
 TERMUX_PKG_SHA256=0ba699c7c6c66f4ba640be78cb38a24715add9683f3e3a199f5369dc5a4f04ac
 TERMUX_PKG_AUTO_UPDATE=true

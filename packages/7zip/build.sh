@@ -8,7 +8,7 @@ DOC/unRarLicense.txt
 "
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="26.02"
-TERMUX_PKG_REVISION=2
+TERMUX_PKG_REVISION=3
 TERMUX_PKG_SRCURL=(
 	"https://www.7-zip.org/a/7z${TERMUX_PKG_VERSION//./}-src.tar.xz"
 	"https://www.7-zip.org/a/7z${TERMUX_PKG_VERSION//./}-linux-arm.tar.xz" # for manual, arm is smallest
