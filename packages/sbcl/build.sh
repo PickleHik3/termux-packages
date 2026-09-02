@@ -70,8 +70,14 @@ termux_step_make() {
 		# some other bionic-libc commands, and bionic-libc build artifacts,
 		# but runs the host cross-compiler and the host sbcl binary to compile
 		# bootstrapping lisp code and compile the C-based runtime code.
+		# CC has to be passed, exactly as the run-tests.sh call below does it.
+		# Without it make-config.sh leaves CC unset, tools-for-build/Makefile falls
+		# back to make's default "cc", and inside proot that resolves to a clang
+		# carrying no sysroot -- so the very first probe dies with
+		# "tools-for-build/determine-endianness.c:20:10: fatal error: 'stdio.h' file
+		# not found" before any of SBCL's own code is reached.
 		termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH= \
-			CFLAGS="$CFLAGS" CPPFLAGS="$CPPFLAGS" LINKFLAGS="$LDFLAGS" \
+			CC="$CC" CFLAGS="$CFLAGS" CPPFLAGS="$CPPFLAGS" LINKFLAGS="$LDFLAGS" \
 			sh make.sh \
 				--xc-host="${TERMUX_PKG_HOSTBUILD_DIR}/bin/sbcl --norc" \
 				--prefix="$TERMUX_PREFIX" \

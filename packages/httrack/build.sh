@@ -2,9 +2,15 @@ TERMUX_PKG_HOMEPAGE=http://www.httrack.com
 TERMUX_PKG_DESCRIPTION="It allows you to download a World Wide Web site from the Internet"
 TERMUX_PKG_LICENSE="GPL-3.0"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="3.49.15"
+# Debian expires old versions out of the pool, and 3.49.15 is gone: the recipe's
+# URL now 404s, and so does archive.debian.org and httrack's own historical mirror.
+# The pool currently carries 3.49.2/4/6/23/25 and 3.50.0, so there is no way to
+# build the pinned version at all. Bumped to the newest one present; the tarball was
+# checked to be real httrack source (AC_INIT([httrack], [3.50.0], ...)) rather than
+# an error page before this hash was taken.
+TERMUX_PKG_VERSION="3.50.0"
 TERMUX_PKG_SRCURL=https://ftp.debian.org/debian/pool/main/h/httrack/httrack_${TERMUX_PKG_VERSION}.orig.tar.gz
-TERMUX_PKG_SHA256=7b4aa173f603d2c66b5d07d455c2c1c40bf3d2923ede912b9e48737f0e848a00
+TERMUX_PKG_SHA256=9511ebf352eb0b6fb958afafaaf29eb76736440eaf9746006b03e38b1335503e
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="httrack-data, libandroid-execinfo, libiconv, openssl, zlib"
 TERMUX_PKG_BREAKS="httrack-dev"
