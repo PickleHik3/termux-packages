@@ -8,7 +8,9 @@ TERMUX_PKG_VERSION="1.26.0"
 # other packages" on install. Its subpackage takes lib/python*, and nothing matched,
 # which means --with-pyunbound produced no bindings in the cross build. That deb
 # predates any log we still have, so bump the revision to force a rebuild and get one.
-TERMUX_PKG_REVISION=1
+# 2, not 1: revision 1 is already published, so the first bump left recipe and pool
+# identical and the queue skipped the rebuild this was meant to force.
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://nlnetlabs.nl/downloads/unbound/unbound-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=77458a7156e275c0b7b17fabcb357cb12445d95cfcb26fb9bb7d5ecba45e0b63
 TERMUX_PKG_AUTO_UPDATE=true
