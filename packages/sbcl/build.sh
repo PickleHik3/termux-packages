@@ -70,14 +70,22 @@ termux_step_make() {
 		# some other bionic-libc commands, and bionic-libc build artifacts,
 		# but runs the host cross-compiler and the host sbcl binary to compile
 		# bootstrapping lisp code and compile the C-based runtime code.
-		# CC has to be passed, exactly as the run-tests.sh call below does it.
-		# Without it make-config.sh leaves CC unset, tools-for-build/Makefile falls
-		# back to make's default "cc", and inside proot that resolves to a clang
-		# carrying no sysroot -- so the very first probe dies with
+		# Still broken: make-config.sh dies on
 		# "tools-for-build/determine-endianness.c:20:10: fatal error: 'stdio.h' file
-		# not found" before any of SBCL's own code is reached.
+		# not found" before any SBCL code is compiled. Passing CC="$CC" here (as the
+		# run-tests.sh call below does) does NOT fix it -- tried, same failure. Notes
+		# for the next attempt, so the same ground is not covered twice:
+		#   - make-config.sh:810 runs `$CC determine-endianness.c -o ...` with no
+		#     CFLAGS or CPPFLAGS, unlike tools-for-build/Makefile:21 which passes
+		#     both. So flags in CPPFLAGS/CFLAGS never reach this compile.
+		#   - but CC is $TERMUX_HOST_PLATFORM-clang, a wrapper that already carries
+		#     --target and --sysroot, so bare `$CC file.c` ought to find stdio.h.
+		#   - and termux-proot-run is `proot -q qemu-$ARCH -R /`, so the NDK sysroot
+		#     is not hidden by the rootfs switch either.
+		# Whatever breaks the include path is therefore something else about running
+		# clang under proot/qemu; find out what before changing this line again.
 		termux-proot-run env LD_PRELOAD= LD_LIBRARY_PATH= \
-			CC="$CC" CFLAGS="$CFLAGS" CPPFLAGS="$CPPFLAGS" LINKFLAGS="$LDFLAGS" \
+			CFLAGS="$CFLAGS" CPPFLAGS="$CPPFLAGS" LINKFLAGS="$LDFLAGS" \
 			sh make.sh \
 				--xc-host="${TERMUX_PKG_HOSTBUILD_DIR}/bin/sbcl --norc" \
 				--prefix="$TERMUX_PREFIX" \
