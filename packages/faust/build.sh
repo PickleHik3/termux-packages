@@ -2,7 +2,7 @@ TERMUX_PKG_HOMEPAGE=https://github.com/grame-cncm/faust
 TERMUX_PKG_DESCRIPTION="A functional programming language for signal processing and sound synthesis"
 TERMUX_PKG_MAINTAINER="@termux"
 TERMUX_PKG_VERSION="2.85.9"
-TERMUX_PKG_REVISION=1
+TERMUX_PKG_REVISION=2
 TERMUX_PKG_SRCURL=https://github.com/grame-cncm/faust/releases/download/${TERMUX_PKG_VERSION}/faust-${TERMUX_PKG_VERSION}.tar.gz
 TERMUX_PKG_SHA256=0cd00968f81357b78df64c25aad12ec94bd4b75bd489ca0449fe7f7b1ad0efe1
 TERMUX_PKG_AUTO_UPDATE=true
@@ -70,8 +70,13 @@ termux_step_post_make_install() {
 	done
 
 	mv usage.sh faustusage.sh
-	# find all ASCII scripts
-	local faustscripts=$(find . -type f -exec grep -Iq . {} \; -print)
+	# Find faust's own ASCII scripts. Scoped to faust*: this runs in the shared
+	# $TERMUX_PREFIX/bin, so an unscoped find matches every other package's
+	# scripts too, and the sed below rewrites them -- which both corrupts them
+	# and makes termux_step_massage collect them into faust's payload. The
+	# published 2.85.9 deb carried 238 foreign files this way (apt-key,
+	# apachectl, the clang wrappers, ...).
+	local faustscripts=$(find . -maxdepth 1 -type f -name 'faust*' -exec grep -Iq . {} \; -print)
 
 	sed -i 's/usage.sh/faustusage.sh/g' $faustscripts
 
