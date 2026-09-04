@@ -148,6 +148,19 @@ declare -A PUBLISHED=()
 while read -r _n _v; do PUBLISHED[$_n]=$_v; done < "$PUBLISHED_TSV"
 log "Published index: ${#PUBLISHED[@]} packages"
 
+# A recipe whose dependency closure reaches an exclusion that is absent from
+# the repository (or published at the wrong version) cannot build:
+# build-package.sh refuses to build the excluded dependency and wants the deb
+# instead. Attempting them anyway costs a full dependency resolution each pass
+# and buries the genuinely broken packages in the FAIL list.
+declare -A BLOCKED=()
+if [[ -x ./blocked-by-exclusion.py ]]; then
+    while IFS=$'\t' read -r _p _why; do
+        [[ -n "$_p" ]] && BLOCKED[$_p]="$_why"
+    done < <(./blocked-by-exclusion.py "$PUBLISHED_TSV" 2>/dev/null || true)
+    log "Blocked by an unavailable excluded dependency: ${#BLOCKED[@]} packages"
+fi
+
 # Debs already in output/ were built by an earlier (interrupted) run.
 declare -A SESSION_BUILT=()
 shopt -s nullglob
@@ -175,6 +188,48 @@ declare -a PASS_LIST=() FAIL_LIST=() SKIP_LIST=()
 # ---------------------------------------------------------------------------
 # Collect finished job results from RESULTS_DIR and log them.
 # ---------------------------------------------------------------------------
+# Bionic lacks a handful of glibc functions that Termux ships as small shim
+# libraries, and a recipe that misses one fails at link time naming the symbol.
+# httrack (posix_spawnp) and nchat (backtrace_symbols_fd) both cost a triage
+# round on 2026-09-04; the mapping from symbol to library is fixed, so say it.
+declare -A SHIM_FOR_SYMBOL=(
+    [posix_spawn]=libandroid-spawn
+    [posix_spawnp]=libandroid-spawn
+    [posix_spawn_file_actions]=libandroid-spawn
+    [backtrace]=libandroid-execinfo
+    [backtrace_symbols]=libandroid-execinfo
+    [backtrace_symbols_fd]=libandroid-execinfo
+    [glob]=libandroid-glob
+    [globfree]=libandroid-glob
+    [wordexp]=libandroid-wordexp
+    [wordfree]=libandroid-wordexp
+    [shm_open]=libandroid-shmem
+    [shm_unlink]=libandroid-shmem
+    [sem_open]=libandroid-posix-semaphore
+    [sem_close]=libandroid-posix-semaphore
+    [sem_unlink]=libandroid-posix-semaphore
+    [iconv]=libiconv
+    [iconv_open]=libiconv
+    [iconv_close]=libiconv
+)
+
+log_missing_symbol_hint() {
+    local pkg="$1" logfile="$PKG_LOGS/$1.log" sym lib
+    [[ -f "$logfile" ]] || return 0
+    # Only the tail: these logs are appended across passes.
+    local -A suggested=()
+    while read -r sym; do
+        sym="${sym%%@*}"                       # drop any @GLIBC_2.x suffix
+        lib="${SHIM_FOR_SYMBOL[$sym]:-}"
+        [[ -z "$lib" ]] && lib="${SHIM_FOR_SYMBOL[${sym%%_file_actions*}_file_actions]:-}"
+        [[ -n "$lib" ]] && suggested[$lib]=1
+    done < <(tail -400 "$logfile" \
+             | sed -nE "s/.*undefined (symbol|reference): ([A-Za-z_][A-Za-z0-9_]*).*/\\2/p" \
+             | sort -u)
+    [[ ${#suggested[@]} -eq 0 ]] && return 0
+    log "HINT  $pkg links against a bionic gap: add ${!suggested[*]} to TERMUX_PKG_DEPENDS and LDFLAGS"
+}
+
 collect_results() {
     local rf _pkg _status
     for rf in "$RESULTS_DIR"/result_*; do
@@ -186,6 +241,7 @@ collect_results() {
             PASS_LIST+=("$_pkg")
         else
             log "FAIL  $_pkg"
+            log_missing_symbol_hint "$_pkg"
             FAIL_LIST+=("$_pkg")
         fi
     done
@@ -273,6 +329,10 @@ build() {
             log "SKIP  $pkg ($want already in output/)"
             SKIP_LIST+=("$pkg"); return 0
         fi
+    fi
+    if [[ -n "${BLOCKED[$pkg]:-}" ]]; then
+        log "SKIP  $pkg (blocked by ${BLOCKED[$pkg]})"
+        SKIP_LIST+=("$pkg"); return 0
     fi
     if [[ -n "${DRY_RUN:-}" ]]; then
         log "BUILD $pkg (${have:-unpublished} -> ${want:-?})"
