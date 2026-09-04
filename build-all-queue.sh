@@ -328,6 +328,26 @@ for pkg in $(printf '%s\n' "${EXTRA[@]}" | sort); do
 done
 wait_all
 
+
+# Recipes that exist in packages/ but appear in no tier file and have never been
+# published: until now the queue could not see them at all, so even a full
+# UPDATES_ONLY= run skipped them silently (2026-09-04: 79 buildable ones, plus
+# 50 already covered by build-exclusions.txt). build() still applies the
+# exclusion list and the UPDATES_ONLY skip, so nothing here bypasses those.
+for pkg in ${EXTRA[@]+"${EXTRA[@]}"}; do QUEUED[$pkg]=1; done
+UNSEEN=()
+for d in packages/*/; do
+    pkg="${d#packages/}"; pkg="${pkg%/}"
+    [[ -n "${QUEUED[$pkg]:-}" ]] && continue
+    [[ -f "packages/$pkg/build.sh" ]] || continue
+    UNSEEN+=("$pkg")
+done
+log "--- Tier 5: Recipes listed nowhere and never published (${#UNSEEN[@]} packages) ---"
+for pkg in $(printf '%s\n' ${UNSEEN[@]+"${UNSEEN[@]}"} | sort); do
+    build "$pkg"
+done
+wait_all
+
 log "=== build-all-queue DONE ==="
 log "PASS  (${#PASS_LIST[@]}): ${PASS_LIST[*]:-none}"
 log "FAIL  (${#FAIL_LIST[@]}): ${FAIL_LIST[*]:-none}"
