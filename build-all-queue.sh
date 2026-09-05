@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# build-all-queue.sh — Build all 1664 queued packages in dependency-tier order.
+# build-all-queue.sh — Build every queued package in dependency-tier order.
 #
 # Reads package lists from three tier files (relative to this script):
 #   build-tier1-libs.txt     (289 libraries)
 #   build-tier2-runtimes.txt (26 language runtimes / build tools)
 #   build-tier3-tools.txt    (1349 tools and applications)
+#
+# Tier 4 then covers published packages no tier file lists, and tiers 5+ every
+# remaining recipe, one tier per directory in repo.json: packages/,
+# x11-packages/, root-packages/.
 #
 # Run from inside the termux-package-builder container:
 #   docker exec -w /home/builder/termux-packages termux-package-builder \
@@ -105,6 +109,26 @@ purge_pip_buildtool_shadows() {
 TIER1="build-tier1-libs.txt"
 TIER2="build-tier2-runtimes.txt"
 TIER3="build-tier3-tools.txt"
+
+# ---------------------------------------------------------------------------
+# Recipe directories, in the order repo.json declares them.
+#
+# build-package.sh resolves a package name across all of them
+# (TERMUX_PACKAGES_DIRECTORIES, read from repo.json), but every lookup in this
+# queue was hardcoded to packages/ until 2026-09-05. That made the 939
+# x11-packages/ and 71 root-packages/ recipes invisible: listing one in a tier
+# file only produced "no recipe", and Tier 5 never enumerated them at all.
+# All three publish into the same component, so nothing downstream changes.
+# ---------------------------------------------------------------------------
+RECIPE_DIRS=(packages x11-packages root-packages)
+
+recipe_dir() {
+    local d
+    for d in "${RECIPE_DIRS[@]}"; do
+        [[ -f "$d/$1/build.sh" ]] && { printf '%s' "$d"; return 0; }
+    done
+    return 1
+}
 
 for f in "$TIER1" "$TIER2" "$TIER3"; do
     [[ -f "$f" ]] || { echo "ERROR: missing $f"; exit 1; }
@@ -296,8 +320,9 @@ launch() {
 # (arrays, variables) returns empty and the package falls through to
 # build-package.sh, which does the authoritative already-built check itself.
 recipe_version() {
-    local f="packages/$1/build.sh" v r
-    [[ -f "$f" ]] || return 0
+    local d f v r
+    d=$(recipe_dir "$1") || return 0
+    f="$d/$1/build.sh"
     v=$(sed -nE 's/^TERMUX_PKG_VERSION=["'"'"']?([^"'"'"' $]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
     [[ -z "$v" || "$v" == *'$'* || "$v" == '('* ]] && return 0
     r=$(sed -nE 's/^TERMUX_PKG_REVISION=["'"'"']?([0-9]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
@@ -310,7 +335,7 @@ build() {
         log "SKIP  $pkg (build-exclusions.txt)"
         SKIP_LIST+=("$pkg"); return 0
     fi
-    if [[ ! -d "packages/$pkg" ]]; then
+    if ! recipe_dir "$pkg" >/dev/null; then
         log "SKIP  $pkg (no recipe -- removed upstream or a subpackage)"
         SKIP_LIST+=("$pkg"); return 0
     fi
@@ -379,7 +404,7 @@ done
 EXTRA=()
 for pkg in "${!PUBLISHED[@]}"; do
     [[ -n "${QUEUED[$pkg]:-}" ]] && continue
-    [[ -d "packages/$pkg" ]] || continue
+    recipe_dir "$pkg" >/dev/null || continue
     EXTRA+=("$pkg")
 done
 log "--- Tier 4: Published packages missing from the tier files (${#EXTRA[@]} packages) ---"
@@ -389,24 +414,34 @@ done
 wait_all
 
 
-# Recipes that exist in packages/ but appear in no tier file and have never been
-# published: until now the queue could not see them at all, so even a full
-# UPDATES_ONLY= run skipped them silently (2026-09-04: 79 buildable ones, plus
-# 50 already covered by build-exclusions.txt). build() still applies the
-# exclusion list and the UPDATES_ONLY skip, so nothing here bypasses those.
+# Recipes that appear in no tier file and have never been published: until
+# 2026-09-04 the queue could not see them at all, so even a full UPDATES_ONLY=
+# run skipped them silently. build() still applies the exclusion list and the
+# UPDATES_ONLY skip, so nothing here bypasses those.
+#
+# One tier per recipe directory, main first: a run that the Azure credit cuts
+# short should leave the main repository whole rather than a slice of each.
+# Within a tier the order is alphabetical -- build-package.sh -I builds any
+# dependency the repository lacks as part of the dependent's own run, so
+# dependency order does not have to be spelled out here.
 for pkg in ${EXTRA[@]+"${EXTRA[@]}"}; do QUEUED[$pkg]=1; done
-UNSEEN=()
-for d in packages/*/; do
-    pkg="${d#packages/}"; pkg="${pkg%/}"
-    [[ -n "${QUEUED[$pkg]:-}" ]] && continue
-    [[ -f "packages/$pkg/build.sh" ]] || continue
-    UNSEEN+=("$pkg")
+tier=5
+for rdir in "${RECIPE_DIRS[@]}"; do
+    UNSEEN=()
+    for d in "$rdir"/*/; do
+        pkg="${d#"$rdir"/}"; pkg="${pkg%/}"
+        [[ -n "${QUEUED[$pkg]:-}" ]] && continue
+        [[ -f "$rdir/$pkg/build.sh" ]] || continue
+        QUEUED[$pkg]=1
+        UNSEEN+=("$pkg")
+    done
+    log "--- Tier $tier: $rdir/ recipes listed nowhere and never published (${#UNSEEN[@]} packages) ---"
+    for pkg in $(printf '%s\n' ${UNSEEN[@]+"${UNSEEN[@]}"} | sort); do
+        build "$pkg"
+    done
+    wait_all
+    tier=$((tier + 1))
 done
-log "--- Tier 5: Recipes listed nowhere and never published (${#UNSEEN[@]} packages) ---"
-for pkg in $(printf '%s\n' ${UNSEEN[@]+"${UNSEEN[@]}"} | sort); do
-    build "$pkg"
-done
-wait_all
 
 log "=== build-all-queue DONE ==="
 log "PASS  (${#PASS_LIST[@]}): ${PASS_LIST[*]:-none}"

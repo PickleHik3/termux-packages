@@ -1,5 +1,14 @@
+# Packages the queue must not build. A name here is refused as a build target
+# and refused as a dependency: build-package.sh wants the deb from the
+# repository instead, so anything whose dependency closure reaches an exclusion
+# that is unpublished cannot build either (blocked-by-exclusion.py reports it).
+# Say why, in one line — the reasons for the original list were lost with the
+# machine that wrote it.
+#
+# 2026-09-05: at-spi2-core, sound-theme-freedesktop and libdisplay-info were
+# removed from this list. They carried no recorded reason and between them
+# blocked 715 of the 939 x11 recipes; they now get one honest build attempt.
 angle-android
-at-spi2-core
 bitcoin
 cabal-install
 chntpw
@@ -14,7 +23,6 @@ gpsbabel
 icon-naming-utils
 icoutils
 lfortran
-libdisplay-info
 libglvnd
 libgnustep-base
 libseat
@@ -35,7 +43,6 @@ pypy3
 ravencoin
 recoll
 solidity
-sound-theme-freedesktop
 spidermonkey
 termux-gui-bash
 termux-gui-c
@@ -50,3 +57,13 @@ vlc
 whitebox-tools
 zeronet
 dotnet9.0
+
+# Chromium- and Gecko-class trees: each is many hours to a day on 4 vCPUs, and
+# the Azure credit expires 2026-09-26. Excluded so the x11 pass spends its
+# remaining time on the other 930 recipes rather than on six of them.
+chromium                # chromium tree
+firefox                 # gecko tree
+thunderbird             # gecko tree
+libreoffice             # multi-hour, pulls its own toolchain
+qt5-qtwebengine         # chromium tree
+qt6-qtwebengine         # chromium tree

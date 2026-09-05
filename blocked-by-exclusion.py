@@ -30,6 +30,30 @@ from pathlib import Path
 
 DEPENDS_KEYS = ("TERMUX_PKG_DEPENDS", "TERMUX_PKG_BUILD_DEPENDS")
 
+# The directories repo.json declares, which is where build-package.sh looks a
+# package name up. Scanning only packages/ made every x11 and root recipe
+# invisible here: their dependencies resolved to nothing and no exclusion in
+# their closure was ever reported.
+RECIPE_DIRS = ("packages", "x11-packages", "root-packages")
+
+
+def build_files(root: Path):
+    for directory in RECIPE_DIRS:
+        yield from root.glob(f"{directory}/*/build.sh")
+
+
+def subpackage_files(root: Path):
+    for directory in RECIPE_DIRS:
+        yield from root.glob(f"{directory}/*/*.subpackage.sh")
+
+
+def find_recipe(root: Path, recipe: str) -> Path | None:
+    for directory in RECIPE_DIRS:
+        candidate = root / directory / recipe / "build.sh"
+        if candidate.is_file():
+            return candidate
+    return None
+
 
 def recipe_version(build_sh: Path) -> str | None:
     """Version the queue would build, or None when it is computed at runtime."""
@@ -51,16 +75,16 @@ def recipe_version(build_sh: Path) -> str | None:
 def load_graph(root: Path) -> tuple[dict[str, set[str]], dict[str, str]]:
     """Returns (recipe -> dependency recipes, deb name -> owning recipe)."""
     owner: dict[str, str] = {}
-    for build_sh in root.glob("packages/*/build.sh"):
+    for build_sh in build_files(root):
         owner[build_sh.parent.name] = build_sh.parent.name
-    for sub in root.glob("packages/*/*.subpackage.sh"):
+    for sub in subpackage_files(root):
         # Dependencies name subpackages ("dotnet-runtime-9.0"), not the recipe
         # that produces them ("dotnet9.0"); without this the closure silently
         # matches nothing for exactly the packages that need it most.
         owner[sub.name[: -len(".subpackage.sh")]] = sub.parent.name
 
     deps: dict[str, set[str]] = {}
-    for build_sh in root.glob("packages/*/build.sh"):
+    for build_sh in build_files(root):
         text = build_sh.read_text(errors="replace")
         found: set[str] = set()
         for key in DEPENDS_KEYS:
@@ -83,8 +107,8 @@ def fatal_exclusions(root: Path, owner: dict[str, str], published: dict[str, str
             excluded.add(line)
     fatal: dict[str, str] = {}
     for recipe in excluded:
-        build_sh = root / "packages" / recipe / "build.sh"
-        if not build_sh.is_file():
+        build_sh = find_recipe(root, recipe)
+        if build_sh is None:
             continue
         want = recipe_version(build_sh)
         debs = [name for name, parent in owner.items() if parent == recipe]
