@@ -67,3 +67,8 @@ thunderbird             # gecko tree
 libreoffice             # multi-hour, pulls its own toolchain
 qt5-qtwebengine         # chromium tree
 qt6-qtwebengine         # chromium tree
+
+# Toolchain-version fights, not recipe bugs: neither has ever produced a deb and
+# each burns its whole PKG_TIMEOUT (6h) before failing, every pass.
+swift                   # NDK-r29 libc++ header collision
+tinygo                  # LLVM ABI mismatch
