@@ -7,8 +7,8 @@
 #   build-tier3-tools.txt    (1349 tools and applications)
 #
 # Tier 4 then covers published packages no tier file lists, and tiers 5+ every
-# remaining recipe, one tier per directory in repo.json: packages/,
-# x11-packages/, root-packages/.
+# remaining recipe, one tier per directory in QUEUE_RECIPE_DIRS (packages/ by
+# default; x11-packages/ and root-packages/ are opt-in).
 #
 # Run from inside the termux-package-builder container:
 #   docker exec -w /home/builder/termux-packages termux-package-builder \
@@ -121,6 +121,14 @@ TIER3="build-tier3-tools.txt"
 # All three publish into the same component, so nothing downstream changes.
 # ---------------------------------------------------------------------------
 RECIPE_DIRS=(packages x11-packages root-packages)
+
+# Which of them the queue *enumerates*. Lookups always span all three -- a
+# recipe named in a tier file has to resolve wherever it lives -- but building
+# every x11 recipe is a storage decision, not a build one: upstream's x11 pool
+# is 4.3 GB against an R2 free tier of 10 GB that the repository is already
+# sitting on. Opt in per run:
+#   QUEUE_RECIPE_DIRS="packages x11-packages" ~/run-queue.sh
+QUEUE_RECIPE_DIRS="${QUEUE_RECIPE_DIRS:-packages}"
 
 recipe_dir() {
     local d
@@ -426,7 +434,7 @@ wait_all
 # dependency order does not have to be spelled out here.
 for pkg in ${EXTRA[@]+"${EXTRA[@]}"}; do QUEUED[$pkg]=1; done
 tier=5
-for rdir in "${RECIPE_DIRS[@]}"; do
+for rdir in $QUEUE_RECIPE_DIRS; do
     UNSEEN=()
     for d in "$rdir"/*/; do
         pkg="${d#"$rdir"/}"; pkg="${pkg%/}"
