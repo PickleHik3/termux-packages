@@ -323,17 +323,47 @@ launch() {
     ) &
 }
 
-# Cheap recipe version read for the skip test below. Handles the common
-# TERMUX_PKG_VERSION="x" / TERMUX_PKG_REVISION=n shape; anything fancier
-# (arrays, variables) returns empty and the package falls through to
-# build-package.sh, which does the authoritative already-built check itself.
+# Recipe version for the skip test below.
+#
+# The cheap sed only understands TERMUX_PKG_VERSION="x". Roughly 250 recipes
+# write something it cannot read -- an array (perl, ncurses, maxima) or a
+# reference to a variable set earlier in the file (readline, python2, tcc) --
+# and for those it returned empty, which means "unknown", which means build.
+# So they rebuilt on every single pass and produced a deb whose version was
+# already published, which stage-debs.py then discarded: 47 of the 52 builds
+# in the 2026-09-05 run were this, about five hours of the VM's day.
+#
+# Both shapes need the file's own variables, so read them the way
+# build-package.sh does and source it. In a subshell, under timeout, with
+# output discarded: a recipe that errors, hangs or prints falls back to
+# "unknown" and is built, exactly as it is today.
 recipe_version() {
     local d f v r
     d=$(recipe_dir "$1") || return 0
     f="$d/$1/build.sh"
-    v=$(sed -nE 's/^TERMUX_PKG_VERSION=["'"'"']?([^"'"'"' $]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
-    [[ -z "$v" || "$v" == *'$'* || "$v" == '('* ]] && return 0
-    r=$(sed -nE 's/^TERMUX_PKG_REVISION=["'"'"']?([0-9]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
+    # Fast path: a plain literal on one line, no array, no expansion.
+    v=$(sed -nE 's/^TERMUX_PKG_VERSION=["'"'"']?([^"'"'"' $(]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
+    if [[ -n "$v" ]]; then
+        r=$(sed -nE 's/^TERMUX_PKG_REVISION=["'"'"']?([0-9]+)["'"'"']?\s*$/\1/p' "$f" | head -1)
+        printf '%s%s' "$v" "${r:+-$r}"
+        return 0
+    fi
+    local out
+    out=$(timeout 10 bash -c '
+        set +u
+        TERMUX_PKG_VERSION=()
+        TERMUX_PKG_REVISION=
+        source "$1" > /dev/null 2>&1 || exit 1
+        # Element 0 is the package version; later elements are auxiliary
+        # versions of bundled things (maxima ships ECL'"'"'s in element 1).
+        printf "%s\n%s\n" "${TERMUX_PKG_VERSION[0]}" "${TERMUX_PKG_REVISION}"
+    ' _ "$f" 2>/dev/null) || return 0
+    v=$(printf '%s' "$out" | sed -n 1p)
+    r=$(printf '%s' "$out" | sed -n 2p)
+    # A version that still carries an unexpanded $ or whitespace is not one we
+    # can compare against the index; treat it as unknown.
+    [[ -z "$v" || "$v" == *'$'* || "$v" == *[[:space:]]* ]] && return 0
+    [[ "$r" =~ ^[0-9]+$ ]] || r=""
     printf '%s%s' "$v" "${r:+-$r}"
 }
 
